@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>nyantec GbmH mail password change</title>
+		<meta viewport="width=device-width, initial-scale=1">
+		<style type="text/css">
+			input:invalid {
+				border: 2px dashed red;
+			}
+		</style>
+	</head>
+	<body>
+		<main style="max-width: 80ch; margin: auto">
+			<header style="text-align: center">
+				<h1>nyantec GbmH email</h1>
+				<h2>Self-service password change</h2>
+			</header>
+			<!-- TODO use CSS grid to layout the form -->
+			<form action="POST">
+				<div>
+					<label for="username">Username</label>
+					<br>
+					<input id="username" name="username"
+					       required pattern="[a-z]{3}">
+				</div>
+				<div>
+					<label for="old_passwd">Old password</label>
+					<br>
+					<input name="old_passwd" id="old_passwd"
+					       type="password" required>
+				</div>
+
+				<input type="submit">
+			</form>
+			
+			<footer style="text-align: center">
+				<a href="https://nyantec.com/impressum">Impressum</a>
+			</footer>
+		</main>
+	</body>
+</html>
+<!-- Local Variables: -->
+<!-- tab-width: 2 -->
+<!-- css-indent-offset: 2 -->
+<!-- End: -->

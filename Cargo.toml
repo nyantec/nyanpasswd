@@ -1,0 +1,24 @@
+[package]
+name = "mailtest-passwd"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bcrypt = "0.13"
+thiserror = "1.0.37"
+tracing = "0.1.37"
+rand = "0.8.5"
+[dependencies.tokio]
+version = "1.21.2"
+features = ["net", "fs", "io-util", "rt-multi-thread", "macros"]
+[dependencies.hyper]
+version = "0.14.23"
+features = ["server", "runtime", "http1"]
+[dependencies.axum]
+version = "0.5.17"
+features = []
+[dependencies.serde]
+version = "1.0.147"
+features = ["derive"]
