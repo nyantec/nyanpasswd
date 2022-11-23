@@ -1,0 +1,20 @@
+stages:
+ - build
+ - lint
+
+nix-build:
+  stage: build
+  tags:
+   - operations-nix
+  needs: []
+  script:
+   - nix build
+   - nix-copy-closure --include-outputs --to "$NYANTEC_BINARY_CACHE" ./result
+
+rustfmt:
+  stage: lint
+  tags:
+   - operations-nix
+  needs: []
+  script:
+   - nix develop -c cargo fmt --check
