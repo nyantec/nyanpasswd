@@ -38,7 +38,7 @@
         default = nixpkgsFor.${system}.mkShell {
           inputsFrom = [ self.packages.${system}.default ];
           nativeBuildInputs = with nixpkgsFor.${system}; [
-            rustfmt
+            rustfmt postgresql
           ];
         };
       });

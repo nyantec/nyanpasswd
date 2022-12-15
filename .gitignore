@@ -1,3 +1,7 @@
 /target
 /result
 /.direnv
+/data
+.#*
+\#*\#
+*.log
