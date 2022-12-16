@@ -12,6 +12,7 @@ nix-build:
    - nix-copy-closure --include-outputs --to "$NYANTEC_BINARY_CACHE" ./result
 
 rustfmt:
+  allow_failure: true
   stage: lint
   tags:
    - operations-nix
