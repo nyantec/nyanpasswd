@@ -10,6 +10,16 @@ bcrypt = "0.13"
 thiserror = "1.0.37"
 tracing = "0.1.37"
 rand = "0.8.5"
+uuid = { version = "1.2.2", features = ["v4"] }
+argon2 = { version = "0.4.1", features = ["std"] }
+futures = "0.3.25"
+[dependencies.chrono]
+version = "0.4.23"
+default-features = false
+features = ["std", "clock"]
+[dependencies.sqlx]
+version = "0.6.2"
+features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono"]
 [dependencies.tokio]
 version = "1.21.2"
 features = ["net", "fs", "io-util", "rt-multi-thread", "macros"]

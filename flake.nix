@@ -25,6 +25,17 @@
             cargoLock = {
               lockFile = ./Cargo.lock;
             };
+
+            checkInputs = with final; [ postgresql ];
+            preCheck = ''
+              export PGDATA=$TMP/postgresql-data
+              export DATABASE_URL="postgres://localhost?host=$TMP/postgresql&dbname=mail"
+
+              initdb --locale=C --encoding=utf8
+              mkdir -p "$TMP/postgresql"
+              pg_ctl -o "-c unix_socket_directories=$TMP/postgresql" start
+              psql -d postgres -h $TMP/postgresql -c "CREATE DATABASE mail TEMPLATE template0 ENCODING 'utf8' LOCALE 'C';"
+            '';
           }
         ) {};
       };
@@ -38,7 +49,7 @@
         default = nixpkgsFor.${system}.mkShell {
           inputsFrom = [ self.packages.${system}.default ];
           nativeBuildInputs = with nixpkgsFor.${system}; [
-            rustfmt postgresql
+            rustfmt sqlx-cli
           ];
         };
       });
