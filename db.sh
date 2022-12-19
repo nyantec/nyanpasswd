@@ -9,6 +9,14 @@ if [[ "$1" == "start" ]]; then
 	pg_ctl \
 		-o "-c unix_socket_directories=$TMP/postgresql" \
 		start
+elif [[ "$1" == "migrate" ]]; then
+	psql -h "$TMP/postgresql" postgres <<EOF
+CREATE DATABASE mail;
+\connect mail
+\i migrations/0001_init.sql
+EOF
+elif [[ "$1" == "sql" || "$1" == "psql" ]]; then
+	psql -h "$TMP/postgresql" mail
 else
 	pg_ctl "$@"
 fi
