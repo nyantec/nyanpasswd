@@ -36,7 +36,7 @@ struct User {
 	expires_at: Option<chrono::DateTime<chrono::FixedOffset>>,
 }
 
-pub static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!();
+static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!();
 
 enum MigrationsDone {}
 enum Created {}
@@ -105,7 +105,7 @@ impl Service<MigrationsDone> {
 	/// Irreversibly remove a password designated by `label` from the
 	/// specified user.
 	async fn rm_password(&self, user: &str, label: &str) -> sqlx::Result<()> {
-		sqlx::query("DELETE FROM passdb WHERE userid = (SELECT id FROM userdb WHERE username = $1) AND label = $2")
+		sqlx::query("DELETE FROM passdb USING userdb WHERE userid = userdb.id AND userdb.username = $1 AND label = $2")
 			.bind(&user)
 			.bind(&label)
 			.execute(&self.db)
@@ -115,16 +115,18 @@ impl Service<MigrationsDone> {
 	}
 	/// List passwords owned by the current user.
 	async fn list_passwords(&self, user: &str) -> sqlx::Result<Vec<Password>> {
-		sqlx::query_as::<_, Password>("SELECT * FROM passdb WHERE userid = (SELECT id FROM userdb WHERE username = $1)")
-			.bind(user)
-			.fetch_all(&self.db)
-			.await
+		sqlx::query_as::<_, Password>(
+			"SELECT passdb.* FROM passdb INNER JOIN userdb ON userdb.id = userid WHERE userdb.username = $1",
+		)
+		.bind(user)
+		.fetch_all(&self.db)
+		.await
 	}
 
 	/// Verify a password for a user identified by their username.
 	async fn verify_password(&self, user: &str, password: &str) -> sqlx::Result<bool> {
 		let mut stream = sqlx::query_scalar::<_, String>(
-			"SELECT hash FROM passdb WHERE userid = (SELECT userid FROM userdb WHERE username = $1)",
+			"SELECT passdb.hash FROM passdb INNER JOIN userdb ON userid = userdb.id WHERE userdb.username = $1",
 		)
 		.bind(user)
 		.fetch_many(&self.db);
@@ -160,20 +162,17 @@ impl Service<MigrationsDone> {
 	}
 	/// Create a new user.
 	async fn create_user(&self, username: &str, expires_at: Option<chrono::DateTime<chrono::FixedOffset>>) -> sqlx::Result<Uuid> {
-		sqlx::query_as::<_, (Uuid,)>(
-			"
-INSERT INTO userdb (username, expires_at) VALUES ($1, $2) RETURNING id",
-		)
-		.bind(username)
-		.bind(expires_at)
-		.fetch_one(&self.db)
-		.await
-		.map(|ret| ret.0)
+		sqlx::query_scalar::<_, Uuid>("INSERT INTO userdb (username, expires_at) VALUES ($1, $2) RETURNING id")
+			.bind(username)
+			.bind(expires_at)
+			.fetch_one(&self.db)
+			.await
 	}
 	/// Activate or deactivate a user.
 	async fn set_user_active(&self, user: &str, active: bool) -> sqlx::Result<()> {
-		sqlx::query("UPDATE userdb (active) VALUES (true) WHERE username = $1")
+		sqlx::query("UPDATE userdb (active) VALUES ($2) WHERE username = $1")
 			.bind(user)
+			.bind(active)
 			.execute(&self.db)
 			.await?;
 
