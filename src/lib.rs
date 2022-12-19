@@ -31,7 +31,7 @@ struct Password {
 struct User {
 	id: Uuid,
 	username: String,
-	active: bool,
+	login_allowed: bool,
 	created_at: chrono::DateTime<chrono::FixedOffset>,
 	expires_at: Option<chrono::DateTime<chrono::FixedOffset>>,
 }
@@ -126,7 +126,7 @@ impl Service<MigrationsDone> {
 	/// Verify a password for a user identified by their username.
 	async fn verify_password(&self, user: &str, password: &str) -> sqlx::Result<bool> {
 		let mut stream = sqlx::query_scalar::<_, String>(
-			"SELECT passdb.hash FROM passdb INNER JOIN userdb ON userid = userdb.id WHERE userdb.username = $1",
+			"SELECT passdb.hash FROM passdb INNER JOIN userdb ON userid = userdb.id WHERE userdb.username = $1 AND userdb.login_allowed = true",
 		)
 		.bind(user)
 		.fetch_many(&self.db);
@@ -168,11 +168,11 @@ impl Service<MigrationsDone> {
 			.fetch_one(&self.db)
 			.await
 	}
-	/// Activate or deactivate a user.
-	async fn set_user_active(&self, user: &str, active: bool) -> sqlx::Result<()> {
-		sqlx::query("UPDATE userdb (active) VALUES ($2) WHERE username = $1")
+	/// Activate or deactivate a user's login capabilities.
+	async fn set_user_login_allowed(&self, user: &str, login_allowed: bool) -> sqlx::Result<()> {
+		sqlx::query("UPDATE userdb SET login_allowed = $2 WHERE username = $1")
 			.bind(user)
-			.bind(active)
+			.bind(login_allowed)
 			.execute(&self.db)
 			.await?;
 
@@ -222,6 +222,28 @@ mod test {
 		assert_eq!(svc.list_passwords("vsh").await?.len(), 1);
 		assert!(!svc.verify_password("vsh", &password).await?);
 		assert!(svc.verify_password("vsh", &another_password).await?);
+
+		Ok(())
+	}
+
+	#[sqlx::test]
+	async fn test_login_allowed(pool: sqlx::PgPool) -> sqlx::Result<()> {
+		let svc = crate::Service::<super::MigrationsDone> {
+			_migrations: std::marker::PhantomData::<super::MigrationsDone>,
+			db: pool,
+			argon2: argon2::Argon2::new(argon2::Algorithm::Argon2i, Default::default(), Default::default()),
+		};
+
+		// Create a user
+		let uuid = svc.create_user("vsh", None).await?;
+		// Create a password for them
+		let password = svc.new_password("vsh", "longiflorum", None).await?;
+		// Check that they can log in
+		assert!(svc.verify_password("vsh", &password).await?);
+		// Disallow this user to log in
+		svc.set_user_login_allowed("vsh", false).await?;
+		// Check they can't log in
+		assert!(!svc.verify_password("vsh", &password).await?);
 
 		Ok(())
 	}
