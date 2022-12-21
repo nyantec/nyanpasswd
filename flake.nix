@@ -49,8 +49,12 @@
         default = nixpkgsFor.${system}.mkShell {
           inputsFrom = [ self.packages.${system}.default ];
           nativeBuildInputs = with nixpkgsFor.${system}; [
-            rustfmt sqlx-cli
+            rustfmt sqlx-cli rust-analyzer clippy
           ];
+
+          shellHook = ''
+            export DATABASE_URL="postgres://localhost?host=$TMP/postgresql&dbname=mail"
+          '';
         };
       });
     };

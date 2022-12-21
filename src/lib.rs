@@ -12,14 +12,13 @@ mod util {
 	const PASSWORD_LENGTH: usize = 64;
 
 	pub(super) fn gen_password<R: Rng + CryptoRng>(rng: &mut R) -> String {
-		// SAFETY: the Alphanumeric distribution only produces
-		// ASCII alphanumeric characters, which are valid UTF-8
+		// SAFETY: the Alphanumeric distribution only produces ASCII alphanumeric characters, which are valid UTF-8
 		unsafe { String::from_utf8_unchecked(rng.sample_iter(&Alphanumeric).take(PASSWORD_LENGTH).collect::<Vec<u8>>()) }
 	}
 }
 
 #[derive(sqlx::FromRow)]
-struct Password {
+pub struct Password {
 	userid: Uuid,
 	label: String,
 	hash: String,
@@ -28,7 +27,7 @@ struct Password {
 }
 
 #[derive(sqlx::FromRow)]
-struct User {
+pub struct User {
 	id: Uuid,
 	username: String,
 	login_allowed: bool,
@@ -38,15 +37,16 @@ struct User {
 
 static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!();
 
-enum MigrationsDone {}
-enum Created {}
-
 mod sealed {
+	pub enum MigrationsDone {}
+	pub enum Created {}
 	pub trait InitState {}
 	impl InitState for super::MigrationsDone {}
 	impl InitState for super::Created {}
 }
+use sealed::{Created, MigrationsDone};
 
+#[derive(Clone)]
 pub struct Service<S: sealed::InitState> {
 	db: sqlx::PgPool,
 	argon2: Argon2<'static>,
@@ -54,7 +54,7 @@ pub struct Service<S: sealed::InitState> {
 }
 
 impl Service<Created> {
-	fn new(db: sqlx::PgPool) -> Self {
+	pub fn new(db: sqlx::PgPool) -> Self {
 		Self {
 			db,
 			argon2: argon2::Argon2::new(argon2::Algorithm::Argon2i, Default::default(), Default::default()),
@@ -62,7 +62,7 @@ impl Service<Created> {
 		}
 	}
 
-	async fn run_migrations(self) -> sqlx::Result<Service<MigrationsDone>> {
+	pub async fn run_migrations(self) -> sqlx::Result<Service<MigrationsDone>> {
 		MIGRATOR.run(&self.db).await?;
 
 		Ok(Service::<MigrationsDone> {
@@ -74,9 +74,8 @@ impl Service<Created> {
 }
 
 impl Service<MigrationsDone> {
-	/// Generate a password for a user designated by `user` and save
-	/// it with the corresponding `label`.
-	async fn new_password(
+	/// Generate a password for a user designated by `user` and save it with the corresponding `label`.
+	pub async fn new_password(
 		&self,
 		user: &str,
 		label: &str,
@@ -102,9 +101,8 @@ impl Service<MigrationsDone> {
 
 		Ok(password)
 	}
-	/// Irreversibly remove a password designated by `label` from the
-	/// specified user.
-	async fn rm_password(&self, user: &str, label: &str) -> sqlx::Result<()> {
+	/// Irreversibly remove a password designated by `label` from the specified user.
+	pub async fn rm_password(&self, user: &str, label: &str) -> sqlx::Result<()> {
 		sqlx::query("DELETE FROM passdb USING userdb WHERE userid = userdb.id AND userdb.username = $1 AND label = $2")
 			.bind(&user)
 			.bind(&label)
@@ -114,7 +112,7 @@ impl Service<MigrationsDone> {
 		Ok(())
 	}
 	/// List passwords owned by the current user.
-	async fn list_passwords(&self, user: &str) -> sqlx::Result<Vec<Password>> {
+	pub async fn list_passwords(&self, user: &str) -> sqlx::Result<Vec<Password>> {
 		sqlx::query_as::<_, Password>(
 			"SELECT passdb.* FROM passdb INNER JOIN userdb ON userdb.id = userid WHERE userdb.username = $1",
 		)
@@ -124,7 +122,7 @@ impl Service<MigrationsDone> {
 	}
 
 	/// Verify a password for a user identified by their username.
-	async fn verify_password(&self, user: &str, password: &str) -> sqlx::Result<bool> {
+	pub async fn verify_password(&self, user: &str, password: &str) -> sqlx::Result<bool> {
 		let mut stream = sqlx::query_scalar::<_, String>(
 			"SELECT passdb.hash FROM passdb INNER JOIN userdb ON userid = userdb.id WHERE userdb.username = $1 AND userdb.login_allowed = true",
 		)
@@ -150,18 +148,22 @@ impl Service<MigrationsDone> {
 		Ok(false)
 	}
 	/// Resolve a user by its username.
-	async fn find_user_by_name(&self, username: &str) -> sqlx::Result<User> {
+	pub async fn find_user_by_name(&self, username: &str) -> sqlx::Result<User> {
 		sqlx::query_as::<_, User>("SELECT * FROM userdb WHERE username = $1")
 			.bind(username)
 			.fetch_one(&self.db)
 			.await
 	}
 	/// List all users.
-	async fn list_users(&self) -> sqlx::Result<Vec<User>> {
+	pub async fn list_users(&self) -> sqlx::Result<Vec<User>> {
 		sqlx::query_as::<_, User>("SELECT * FROM userdb").fetch_all(&self.db).await
 	}
 	/// Create a new user.
-	async fn create_user(&self, username: &str, expires_at: Option<chrono::DateTime<chrono::FixedOffset>>) -> sqlx::Result<Uuid> {
+	pub async fn create_user(
+		&self,
+		username: &str,
+		expires_at: Option<chrono::DateTime<chrono::FixedOffset>>,
+	) -> sqlx::Result<Uuid> {
 		sqlx::query_scalar::<_, Uuid>("INSERT INTO userdb (username, expires_at) VALUES ($1, $2) RETURNING id")
 			.bind(username)
 			.bind(expires_at)
@@ -169,7 +171,7 @@ impl Service<MigrationsDone> {
 			.await
 	}
 	/// Activate or deactivate a user's login capabilities.
-	async fn set_user_login_allowed(&self, user: &str, login_allowed: bool) -> sqlx::Result<()> {
+	pub async fn set_user_login_allowed(&self, user: &str, login_allowed: bool) -> sqlx::Result<()> {
 		sqlx::query("UPDATE userdb SET login_allowed = $2 WHERE username = $1")
 			.bind(user)
 			.bind(login_allowed)

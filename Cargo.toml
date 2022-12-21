@@ -1,5 +1,5 @@
 [package]
-name = "mailtest-passwd"
+name = "mail-passwd"
 version = "0.1.0"
 edition = "2021"
 
@@ -27,7 +27,7 @@ features = ["net", "fs", "io-util", "rt-multi-thread", "macros"]
 version = "0.14.23"
 features = ["server", "runtime", "http1"]
 [dependencies.axum]
-version = "0.5.17"
+version = "0.6"
 features = []
 [dependencies.serde]
 version = "1.0.147"
