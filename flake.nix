@@ -1,8 +1,7 @@
 {
-
   description = "mailtest-passwd";
 
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+  inputs.nixpkgs.url = "github:nyantec/nixpkgs/release-22.11";
 
   outputs = { self, nixpkgs }:
     let
