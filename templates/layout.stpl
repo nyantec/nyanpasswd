@@ -1,0 +1,26 @@
+<html>
+  <title><%= company_name %> password management system</title>
+  <style type="text/css">
+	table {
+		border: calc(.25em / 3) solid black;
+		border-spacing: 0;
+		border-collapse: collapse;
+	}
+	th, td {
+		border: calc(.25em / 3) solid black;
+		padding: .25em;
+	}
+  </style>
+  <body>
+	<header>
+	  <h1><%= company_name %> password management</h1>
+	</header>
+	<%- body.render_once()? %>
+	<footer>
+	  <div style="text-align: center;">
+		<a href="<%= impressum_link %>">Impressum</a>
+	  </div>
+	</footer>
+  </body>
+</html>
+<!-- -*- mode: html-mode -*- -->

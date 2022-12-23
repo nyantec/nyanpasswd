@@ -1,0 +1,53 @@
+<main>
+  <p>You are logged in as: <%= user.username %></p>
+
+  <h2>Your passwords:</h2>
+  <table>
+	<% if passwords.len() > 0 { %>
+	<thead>
+	  <tr>
+		<th colspan="2">Label</th>
+		<th>Created at</th>
+		<th>Expires at</th>
+	  </tr>
+	</thead>
+	<tbody>
+	  <% for password in passwords { %>
+	  <tr>
+		<th style="border-right: none"><%= password.label %></th>
+		<td style="border-left: none">
+		  <form method="POST" style="display: inline">
+			<input type="hidden" id="label" name="label" value="<%= password.label %>">
+			<button formaction="/delete_password">Delete</button>
+		  </form>
+		</td>
+		<td><time datetime="<%= password.created_at.to_rfc3339() %>">
+			<%= password.created_at.to_string() %>
+		</time></td>
+		<td><%-
+			  password.expires_at.map(|i| {
+			    format!("<time datetime=\"{}\">{}</time>", i.to_rfc3339(), i.to_string())
+			  }).unwrap_or_else(|| "No expiry".to_string())
+			  %>
+		</td>
+	  </tr>
+	  <% } %>
+	</tbody>
+  </table>
+  <% } else { %>
+  <p>You have no passwords at the moment.</p>
+  <% } %>
+  <form method="POST" action="/create_password">
+	<input id="label" name="label" placeholder="Password label">
+	<select name="expires_in">
+	  <option value="noexpiry">No expiry</option>
+	  <option value="week">Expires in 7 days</option>
+	  <option value="month">Expires in 1 month</option>
+	  <option value="sixmonths">Expires in 6 months</option>
+	  <option value="year">Expires in a year</option>
+	</select>
+	<br>
+	<input type="submit" value="Generate password">
+  </form>
+</main>
+<!-- -*- mode: html-mode -*- -->
