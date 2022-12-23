@@ -16,7 +16,8 @@ CREATE DATABASE mail;
 \i migrations/0001_init.sql
 EOF
 elif [[ "$1" == "sql" || "$1" == "psql" ]]; then
-	psql -h "$TMP/postgresql" mail
+	shift 1;
+	psql -h "$TMP/postgresql" mail "$@"
 else
 	pg_ctl "$@"
 fi
