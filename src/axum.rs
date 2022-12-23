@@ -1,9 +1,9 @@
-use std::sync::Arc;
-use axum::response::{Response, IntoResponse};
 use axum::extract::FromRequestParts;
-use axum::http::{StatusCode, request::Parts};
+use axum::http::{request::Parts, StatusCode};
+use axum::response::{IntoResponse, Response};
+use std::sync::Arc;
 
-use super::{Service, MigrationsDone, User};
+use super::{MigrationsDone, Service, User};
 
 lazy_static::lazy_static! {
 	static ref DN_UID_REGEX: regex::Regex = regex::Regex::new(r#"UID ?= ?([a-z][a-z][a-z])"#).unwrap();
@@ -30,27 +30,28 @@ pub enum UserExtractionError {
 	#[error("Required headers `X-SSL-Verify` and/or `X-SSL-Client-Dn` not found")]
 	ReverseProxyMisconfigured,
 	#[error("No UID field in TLS client certificate's Subject DN")]
-	NoUidFieldInCert
+	NoUidFieldInCert,
 }
 
 impl IntoResponse for UserExtractionError {
-    fn into_response(self) -> Response {
-        (
+	fn into_response(self) -> Response {
+		(
 			match &self {
 				UserExtractionError::Sql(err) => StatusCode::INTERNAL_SERVER_ERROR,
 				UserExtractionError::UserNotFound => StatusCode::UNAUTHORIZED,
 				UserExtractionError::NoTlsCert => StatusCode::UNAUTHORIZED,
 				UserExtractionError::CertValidationFailed(_) => StatusCode::FORBIDDEN,
 				UserExtractionError::ReverseProxyMisconfigured => StatusCode::INTERNAL_SERVER_ERROR,
-				UserExtractionError::NoUidFieldInCert => StatusCode::BAD_REQUEST
+				UserExtractionError::NoUidFieldInCert => StatusCode::BAD_REQUEST,
 			},
 			[("Content-Type", "text/plain")],
 			match &self {
 				Self::ReverseProxyMisconfigured => ERROR_MESSAGE_TLS_PROXY_MISCONFIGURED.to_string(),
 				_ => self.to_string(),
-			}
-		).into_response()
-    }
+			},
+		)
+			.into_response()
+	}
 }
 
 #[async_trait::async_trait]
@@ -58,11 +59,13 @@ impl FromRequestParts<Arc<Service<MigrationsDone>>> for User {
 	type Rejection = UserExtractionError;
 
 	async fn from_request_parts(parts: &mut Parts, db: &Arc<Service<MigrationsDone>>) -> Result<Self, Self::Rejection> {
-		match parts.headers.get("X-SSL-Verify")
+		match parts
+			.headers
+			.get("X-SSL-Verify")
 			.map(|s| String::from_utf8_lossy(s.as_bytes()))
 			.as_deref()
 		{
-			Some("SUCCESS") => {},
+			Some("SUCCESS") => {}
 			// We have no client certificate
 			Some("NONE") => return Err(UserExtractionError::NoTlsCert),
 			// Client certificate validation failed (e.g. it was revoked)
@@ -74,7 +77,9 @@ impl FromRequestParts<Arc<Service<MigrationsDone>>> for User {
 				return Err(UserExtractionError::ReverseProxyMisconfigured);
 			}
 		}
-		if let Some(ssl_client_s_dn) = parts.headers.get("X-SSL-Client-Dn")
+		if let Some(ssl_client_s_dn) = parts
+			.headers
+			.get("X-SSL-Client-Dn")
 			.map(|s| String::from_utf8_lossy(s.as_bytes()))
 		{
 			// XXX: This only supports three-letter usernames!
@@ -86,7 +91,7 @@ impl FromRequestParts<Arc<Service<MigrationsDone>>> for User {
 				match db.find_user_by_name(username).await {
 					Ok(Some(user)) => return Ok(user),
 					Ok(None) => return Err(UserExtractionError::UserNotFound),
-					Err(err) => return Err(UserExtractionError::Sql(err))
+					Err(err) => return Err(UserExtractionError::Sql(err)),
 				}
 			} else {
 				return Err(UserExtractionError::NoUidFieldInCert);
@@ -98,7 +103,6 @@ impl FromRequestParts<Arc<Service<MigrationsDone>>> for User {
 			return Err(UserExtractionError::ReverseProxyMisconfigured);
 		}
 	}
-
 }
 
 #[cfg(test)]

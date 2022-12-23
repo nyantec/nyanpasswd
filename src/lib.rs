@@ -87,20 +87,18 @@ impl Service<MigrationsDone> {
 		let mut rng = rand::rngs::OsRng;
 		let password: String = self::util::gen_password(&mut rng);
 
-		sqlx::query(
-			"INSERT INTO passdb (userid, label, hash, expires_at) VALUES ($1, $2, $3, $4)",
-		)
-		.bind(user.id)
-		.bind(label)
-		.bind(
-			self.argon2
-				.hash_password(password.as_bytes(), &SaltString::generate(&mut rng))
-				.unwrap()
-				.to_string(),
-		)
-		.bind(expires_at)
-		.execute(&self.db)
-		.await?;
+		sqlx::query("INSERT INTO passdb (userid, label, hash, expires_at) VALUES ($1, $2, $3, $4)")
+			.bind(user.id)
+			.bind(label)
+			.bind(
+				self.argon2
+					.hash_password(password.as_bytes(), &SaltString::generate(&mut rng))
+					.unwrap()
+					.to_string(),
+			)
+			.bind(expires_at)
+			.execute(&self.db)
+			.await?;
 
 		Ok(password)
 	}
@@ -124,12 +122,10 @@ impl Service<MigrationsDone> {
 		.await
 	}
 	pub async fn list_passwords_for(&self, user: &User) -> sqlx::Result<Vec<Password>> {
-		sqlx::query_as::<_, Password>(
-			"SELECT passdb.* FROM passdb WHERE userid = $1",
-		)
-		.bind(user.id)
-		.fetch_all(&self.db)
-		.await
+		sqlx::query_as::<_, Password>("SELECT passdb.* FROM passdb WHERE userid = $1")
+			.bind(user.id)
+			.fetch_all(&self.db)
+			.await
 	}
 
 	/// Verify a password for a user identified by their username.
@@ -167,9 +163,8 @@ impl Service<MigrationsDone> {
 		{
 			Ok(user) => Ok(Some(user)),
 			Err(sqlx::error::Error::RowNotFound) => Ok(None),
-			Err(err) => Err(err)
+			Err(err) => Err(err),
 		}
-
 	}
 	/// List all users.
 	pub async fn list_users(&self) -> sqlx::Result<Vec<User>> {

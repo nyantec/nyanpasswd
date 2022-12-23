@@ -1,9 +1,9 @@
+use axum::http::StatusCode;
 use axum::Form;
 use axum::{extract::State, response::IntoResponse};
-use axum::http::StatusCode;
+use sailfish::TemplateOnce;
 use sqlx::postgres::PgPoolOptions;
 use std::sync::Arc;
-use sailfish::TemplateOnce;
 
 const COMPANY_NAME: &str = "nyantec GmbH";
 const IMPRESSUM: &str = "https://nyantec.com/impressum/";
@@ -20,13 +20,13 @@ struct Layout<B: TemplateOnce> {
 #[template(path = "main.stpl")]
 struct MainPage {
 	user: mail_passwd::User,
-	passwords: Vec<mail_passwd::Password>
+	passwords: Vec<mail_passwd::Password>,
 }
 
 #[derive(TemplateOnce)]
 #[template(path = "new_password.stpl")]
 struct NewPasswordPage {
-	password: String
+	password: String,
 }
 
 #[derive(TemplateOnce)]
@@ -34,48 +34,59 @@ struct NewPasswordPage {
 struct DeletedPasswordPage;
 
 type Service = mail_passwd::Service<mail_passwd::MigrationsDone>;
-async fn mainpage(
-	State(backend): State<Arc<Service>>,
-	user: mail_passwd::User
-) -> axum::response::Response {
-	axum::response::Html(Layout {
-		company_name: COMPANY_NAME,
-		body: MainPage {
-			passwords: match backend.list_passwords_for(&user).await {
-				Ok(passwords) => passwords,
-				Err(err) => return (
-					StatusCode::INTERNAL_SERVER_ERROR,
-					[("Content-Type", "text/plain")],
-					format!("SQL layer error: {}", err)
-				).into_response()
+async fn mainpage(State(backend): State<Arc<Service>>, user: mail_passwd::User) -> axum::response::Response {
+	axum::response::Html(
+		Layout {
+			company_name: COMPANY_NAME,
+			body: MainPage {
+				passwords: match backend.list_passwords_for(&user).await {
+					Ok(passwords) => passwords,
+					Err(err) => {
+						return (
+							StatusCode::INTERNAL_SERVER_ERROR,
+							[("Content-Type", "text/plain")],
+							format!("SQL layer error: {}", err),
+						)
+							.into_response()
+					}
+				},
+				user,
 			},
-			user,
-		},
-		impressum_link: IMPRESSUM
-	}.render_once().unwrap()).into_response()
+			impressum_link: IMPRESSUM,
+		}
+		.render_once()
+		.unwrap(),
+	)
+	.into_response()
 }
 
 #[derive(serde::Deserialize)]
 struct DeletePasswordForm {
-	label: String
+	label: String,
 }
 
 async fn delete_password(
 	State(backend): State<Arc<Service>>,
 	user: mail_passwd::User,
-	Form(form): Form<DeletePasswordForm>
+	Form(form): Form<DeletePasswordForm>,
 ) -> axum::response::Response {
 	match backend.rm_password_for(&user, &form.label).await {
-		Ok(()) => axum::response::Html(Layout {
-			company_name: COMPANY_NAME,
-			body: DeletedPasswordPage,
-			impressum_link: IMPRESSUM
-		}.render_once().unwrap()).into_response(),
+		Ok(()) => axum::response::Html(
+			Layout {
+				company_name: COMPANY_NAME,
+				body: DeletedPasswordPage,
+				impressum_link: IMPRESSUM,
+			}
+			.render_once()
+			.unwrap(),
+		)
+		.into_response(),
 		Err(err) => (
 			StatusCode::INTERNAL_SERVER_ERROR,
 			[("Content-Type", "text/plain")],
-			format!("SQL layer error: {}", err)
-		).into_response()
+			format!("SQL layer error: {}", err),
+		)
+			.into_response(),
 	}
 }
 
@@ -86,46 +97,56 @@ enum ExpiresIn {
 	Week,
 	Month,
 	SixMonths,
-	Year
+	Year,
 }
 #[derive(serde::Deserialize)]
 struct CreatePasswordForm {
 	label: String,
-	expires_in: ExpiresIn
+	expires_in: ExpiresIn,
 }
 
 async fn create_password(
 	State(backend): State<Arc<Service>>,
 	user: mail_passwd::User,
-	Form(form): Form<CreatePasswordForm>
+	Form(form): Form<CreatePasswordForm>,
 ) -> axum::response::Response {
 	fn get_time_after_days(days: u64) -> chrono::DateTime<chrono::FixedOffset> {
-		chrono::DateTime::<chrono::Utc>::from(
-			std::time::SystemTime::now()
-				+ std::time::Duration::from_secs(days * 60 * 60 * 24)
-		).into()
+		chrono::DateTime::<chrono::Utc>::from(std::time::SystemTime::now() + std::time::Duration::from_secs(days * 60 * 60 * 24))
+			.into()
 	}
 
-	match backend.new_password(&user, &form.label, match form.expires_in {
-		ExpiresIn::NoExpiry => None,
-		ExpiresIn::Week => Some(get_time_after_days(7)),
-		ExpiresIn::Month => Some(get_time_after_days(30)),
-		ExpiresIn::SixMonths => Some(get_time_after_days(30 * 6)),
-		ExpiresIn::Year => Some(get_time_after_days(365)),
-	}).await {
-		Ok(password) => axum::response::Html(Layout {
-			company_name: COMPANY_NAME,
-			body: NewPasswordPage { password },
-			impressum_link: IMPRESSUM
-		}.render_once().unwrap()).into_response(),
+	match backend
+		.new_password(
+			&user,
+			&form.label,
+			match form.expires_in {
+				ExpiresIn::NoExpiry => None,
+				ExpiresIn::Week => Some(get_time_after_days(7)),
+				ExpiresIn::Month => Some(get_time_after_days(30)),
+				ExpiresIn::SixMonths => Some(get_time_after_days(30 * 6)),
+				ExpiresIn::Year => Some(get_time_after_days(365)),
+			},
+		)
+		.await
+	{
+		Ok(password) => axum::response::Html(
+			Layout {
+				company_name: COMPANY_NAME,
+				body: NewPasswordPage { password },
+				impressum_link: IMPRESSUM,
+			}
+			.render_once()
+			.unwrap(),
+		)
+		.into_response(),
 		Err(err) => (
 			StatusCode::INTERNAL_SERVER_ERROR,
 			[("Content-Type", "text/plain")],
-			format!("SQL layer error: {}", err)
-		).into_response()
+			format!("SQL layer error: {}", err),
+		)
+			.into_response(),
 	}
 }
-
 
 #[tokio::main]
 async fn main() -> Result<(), hyper::Error> {
