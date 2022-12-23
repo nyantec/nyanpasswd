@@ -13,6 +13,10 @@ rand = "0.8.5"
 uuid = { version = "1.2.2", features = ["v4"] }
 argon2 = { version = "0.4.1", features = ["std"] }
 futures = "0.3.25"
+sailfish = "0.5.0"
+async-trait = "0.1.60"
+regex = "1.7.0"
+lazy_static = "1.4.0"
 [dependencies.chrono]
 version = "0.4.23"
 default-features = false

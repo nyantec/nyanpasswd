@@ -17,7 +17,7 @@ mod util {
 	}
 }
 
-#[derive(sqlx::FromRow)]
+#[derive(sqlx::FromRow, Debug)]
 pub struct Password {
 	userid: Uuid,
 	label: String,
@@ -26,7 +26,7 @@ pub struct Password {
 	expires_at: Option<chrono::DateTime<chrono::FixedOffset>>,
 }
 
-#[derive(sqlx::FromRow)]
+#[derive(sqlx::FromRow, Debug)]
 pub struct User {
 	id: Uuid,
 	username: String,
@@ -44,7 +44,8 @@ mod sealed {
 	impl InitState for super::MigrationsDone {}
 	impl InitState for super::Created {}
 }
-use sealed::{Created, MigrationsDone};
+use sealed::Created;
+pub use sealed::MigrationsDone;
 
 #[derive(Clone)]
 pub struct Service<S: sealed::InitState> {
@@ -148,11 +149,17 @@ impl Service<MigrationsDone> {
 		Ok(false)
 	}
 	/// Resolve a user by its username.
-	pub async fn find_user_by_name(&self, username: &str) -> sqlx::Result<User> {
-		sqlx::query_as::<_, User>("SELECT * FROM userdb WHERE username = $1")
+	pub async fn find_user_by_name(&self, username: &str) -> sqlx::Result<Option<User>> {
+		match sqlx::query_as::<_, User>("SELECT * FROM userdb WHERE username = $1")
 			.bind(username)
 			.fetch_one(&self.db)
 			.await
+		{
+			Ok(user) => Ok(Some(user)),
+			Err(sqlx::error::Error::RowNotFound) => Ok(None),
+			Err(err) => Err(err)
+		}
+
 	}
 	/// List all users.
 	pub async fn list_users(&self) -> sqlx::Result<Vec<User>> {
@@ -184,22 +191,26 @@ impl Service<MigrationsDone> {
 
 #[cfg(test)]
 mod test {
-	#[sqlx::test]
-	async fn smoke_test(pool: sqlx::PgPool) -> sqlx::Result<()> {
+	fn create_service(pool: sqlx::PgPool) -> crate::Service<super::MigrationsDone> {
 		// Note: you are DEFINITELY NOT SUPPOSED to be creating this
 		// object like that! SQLx test harness automatically applies
 		// migrations, so we don't need to run them a second time.
 		//
-		// Since the typestate objects are actually private, you will
-		// not be able to bypass migrations normally.
-		let svc = crate::Service::<super::MigrationsDone> {
+		// Since the typestate field is private, you won't be able to
+		// do it in external code anyway.
+		crate::Service::<super::MigrationsDone> {
 			_migrations: std::marker::PhantomData::<super::MigrationsDone>,
 			db: pool,
 			argon2: argon2::Argon2::new(argon2::Algorithm::Argon2i, Default::default(), Default::default()),
-		};
+		}
+	}
+
+	#[sqlx::test]
+	async fn smoke_test(pool: sqlx::PgPool) -> sqlx::Result<()> {
+		let svc = create_service(pool);
 
 		let uuid = svc.create_user("vsh", None).await?;
-		let user = svc.find_user_by_name("vsh").await?;
+		let user = svc.find_user_by_name("vsh").await?.unwrap();
 		assert_eq!(user.id, uuid);
 
 		// Check that no passwords are defined
@@ -230,11 +241,7 @@ mod test {
 
 	#[sqlx::test]
 	async fn test_login_allowed(pool: sqlx::PgPool) -> sqlx::Result<()> {
-		let svc = crate::Service::<super::MigrationsDone> {
-			_migrations: std::marker::PhantomData::<super::MigrationsDone>,
-			db: pool,
-			argon2: argon2::Argon2::new(argon2::Algorithm::Argon2i, Default::default(), Default::default()),
-		};
+		let svc = create_service(pool);
 
 		// Create a user
 		let uuid = svc.create_user("vsh", None).await?;
@@ -246,6 +253,14 @@ mod test {
 		svc.set_user_login_allowed("vsh", false).await?;
 		// Check they can't log in
 		assert!(!svc.verify_password("vsh", &password).await?);
+
+		Ok(())
+	}
+
+	#[sqlx::test]
+	async fn test_non_existent_user(pool: sqlx::PgPool) -> sqlx::Result<()> {
+		let svc = create_service(pool);
+		assert!(svc.find_user_by_name("vsh").await.unwrap().is_none());
 
 		Ok(())
 	}
