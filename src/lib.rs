@@ -17,6 +17,8 @@ mod util {
 	}
 }
 
+mod axum;
+
 #[derive(sqlx::FromRow, Debug)]
 pub struct Password {
 	userid: Uuid,
