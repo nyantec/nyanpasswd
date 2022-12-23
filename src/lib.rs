@@ -21,20 +21,20 @@ mod axum;
 
 #[derive(sqlx::FromRow, Debug)]
 pub struct Password {
-	userid: Uuid,
-	label: String,
-	hash: String,
-	created_at: chrono::DateTime<chrono::FixedOffset>,
-	expires_at: Option<chrono::DateTime<chrono::FixedOffset>>,
+	pub userid: Uuid,
+	pub label: String,
+	pub hash: String,
+	pub created_at: chrono::DateTime<chrono::FixedOffset>,
+	pub expires_at: Option<chrono::DateTime<chrono::FixedOffset>>,
 }
 
 #[derive(sqlx::FromRow, Debug)]
 pub struct User {
-	id: Uuid,
-	username: String,
-	login_allowed: bool,
-	created_at: chrono::DateTime<chrono::FixedOffset>,
-	expires_at: Option<chrono::DateTime<chrono::FixedOffset>>,
+	pub id: Uuid,
+	pub username: String,
+	pub login_allowed: bool,
+	pub created_at: chrono::DateTime<chrono::FixedOffset>,
+	pub expires_at: Option<chrono::DateTime<chrono::FixedOffset>>,
 }
 
 static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!();
@@ -80,7 +80,7 @@ impl Service<MigrationsDone> {
 	/// Generate a password for a user designated by `user` and save it with the corresponding `label`.
 	pub async fn new_password(
 		&self,
-		user: &str,
+		user: &User,
 		label: &str,
 		expires_at: Option<chrono::DateTime<chrono::FixedOffset>>,
 	) -> sqlx::Result<String> {
@@ -88,9 +88,9 @@ impl Service<MigrationsDone> {
 		let password: String = self::util::gen_password(&mut rng);
 
 		sqlx::query(
-			"INSERT INTO passdb (userid, label, hash, expires_at) VALUES ((SELECT id FROM userdb WHERE username = $1), $2, $3, $4)",
+			"INSERT INTO passdb (userid, label, hash, expires_at) VALUES ($1, $2, $3, $4)",
 		)
-		.bind(user)
+		.bind(user.id)
 		.bind(label)
 		.bind(
 			self.argon2
@@ -105,9 +105,9 @@ impl Service<MigrationsDone> {
 		Ok(password)
 	}
 	/// Irreversibly remove a password designated by `label` from the specified user.
-	pub async fn rm_password(&self, user: &str, label: &str) -> sqlx::Result<()> {
-		sqlx::query("DELETE FROM passdb USING userdb WHERE userid = userdb.id AND userdb.username = $1 AND label = $2")
-			.bind(&user)
+	pub async fn rm_password_for(&self, user: &User, label: &str) -> sqlx::Result<()> {
+		sqlx::query("DELETE FROM passdb WHERE userid = $1 AND label = $2")
+			.bind(&user.id)
 			.bind(&label)
 			.execute(&self.db)
 			.await?;
@@ -115,11 +115,19 @@ impl Service<MigrationsDone> {
 		Ok(())
 	}
 	/// List passwords owned by the current user.
-	pub async fn list_passwords(&self, user: &str) -> sqlx::Result<Vec<Password>> {
+	pub async fn list_passwords_for_username(&self, user: &str) -> sqlx::Result<Vec<Password>> {
 		sqlx::query_as::<_, Password>(
 			"SELECT passdb.* FROM passdb INNER JOIN userdb ON userdb.id = userid WHERE userdb.username = $1",
 		)
 		.bind(user)
+		.fetch_all(&self.db)
+		.await
+	}
+	pub async fn list_passwords_for(&self, user: &User) -> sqlx::Result<Vec<Password>> {
+		sqlx::query_as::<_, Password>(
+			"SELECT passdb.* FROM passdb WHERE userid = $1",
+		)
+		.bind(user.id)
 		.fetch_all(&self.db)
 		.await
 	}
@@ -216,27 +224,27 @@ mod test {
 		assert_eq!(user.id, uuid);
 
 		// Check that no passwords are defined
-		assert_eq!(svc.list_passwords("vsh").await?.len(), 0);
-		assert!(!svc.verify_password("vsh", "AAAAAAAA").await?);
+		assert_eq!(svc.list_passwords_for(&user).await?.len(), 0);
+		assert!(!svc.verify_password(&user.username, "AAAAAAAA").await?);
 		// Generate a password and ensure it matches
-		let password = svc.new_password("vsh", "longiflorum", None).await?;
-		assert_eq!(svc.list_passwords("vsh").await?.len(), 1);
-		assert!(svc.verify_password("vsh", &password).await?);
+		let password = svc.new_password(&user, "longiflorum", None).await?;
+		assert_eq!(svc.list_passwords_for(&user).await?.len(), 1);
+		assert!(svc.verify_password(&user.username, &password).await?);
 		// Ensure something else isn't accepted
-		assert!(!svc.verify_password("vsh", "AAAAAAAA").await?);
+		assert!(!svc.verify_password(&user.username, "AAAAAAAA").await?);
 		// Ensure non-unique labels are rejected for the same user
-		svc.new_password("vsh", "longiflorum", None).await.unwrap_err();
+		svc.new_password(&user, "longiflorum", None).await.unwrap_err();
 		// Generate another password and check if it works
-		let another_password = svc.new_password("vsh", "primrose", None).await?;
-		assert_eq!(svc.list_passwords("vsh").await?.len(), 2);
-		assert!(svc.verify_password("vsh", &another_password).await?);
+		let another_password = svc.new_password(&user, "primrose", None).await?;
+		assert_eq!(svc.list_passwords_for(&user).await?.len(), 2);
+		assert!(svc.verify_password(&user.username, &another_password).await?);
 		// Check that the older password still works
-		assert!(svc.verify_password("vsh", &password).await?);
+		assert!(svc.verify_password(&user.username, &password).await?);
 		// Remove a password
-		svc.rm_password("vsh", "longiflorum").await?;
-		assert_eq!(svc.list_passwords("vsh").await?.len(), 1);
-		assert!(!svc.verify_password("vsh", &password).await?);
-		assert!(svc.verify_password("vsh", &another_password).await?);
+		svc.rm_password_for(&user, "longiflorum").await?;
+		assert_eq!(svc.list_passwords_for(&user).await?.len(), 1);
+		assert!(!svc.verify_password(&user.username, &password).await?);
+		assert!(svc.verify_password(&user.username, &another_password).await?);
 
 		Ok(())
 	}
@@ -247,8 +255,10 @@ mod test {
 
 		// Create a user
 		let uuid = svc.create_user("vsh", None).await?;
+		let user = svc.find_user_by_name("vsh").await?.unwrap();
+		assert_eq!(user.id, uuid);
 		// Create a password for them
-		let password = svc.new_password("vsh", "longiflorum", None).await?;
+		let password = svc.new_password(&user, "longiflorum", None).await?;
 		// Check that they can log in
 		assert!(svc.verify_password("vsh", &password).await?);
 		// Disallow this user to log in
