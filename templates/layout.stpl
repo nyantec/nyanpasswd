@@ -1,16 +1,7 @@
+<!DOCTYPE html>
 <html>
   <title><%= company_name %> password management system</title>
-  <style type="text/css">
-	table {
-		border: calc(.25em / 3) solid black;
-		border-spacing: 0;
-		border-collapse: collapse;
-	}
-	th, td {
-		border: calc(.25em / 3) solid black;
-		padding: .25em;
-	}
-  </style>
+  <link rel="stylesheet" href="/static/style.css">
   <body>
 	<header>
 	  <h1><%= company_name %> password management</h1>

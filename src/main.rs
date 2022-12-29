@@ -1,12 +1,13 @@
 use axum::http::StatusCode;
 use axum::Form;
-use axum::{extract::State, response::IntoResponse};
+use axum::{extract::{State, Path}, response::IntoResponse};
 use sailfish::TemplateOnce;
 use sqlx::postgres::PgPoolOptions;
 use std::sync::Arc;
 
 const COMPANY_NAME: &str = "nyantec GmbH";
 const IMPRESSUM: &str = "https://nyantec.com/impressum/";
+const STYLE_CSS: &str = include_str!("../style.css");
 
 #[derive(TemplateOnce)]
 #[template(path = "layout.stpl")]
@@ -148,6 +149,13 @@ async fn create_password(
 	}
 }
 
+async fn static_file_handler(Path(filename): Path<String>) -> axum::response::Response {
+	match filename.as_str() {
+		"style.css" => (StatusCode::OK, [("Content-Type", "text/css")], STYLE_CSS).into_response(),
+		_ => StatusCode::NOT_FOUND.into_response()
+	}
+}
+
 #[tokio::main]
 async fn main() -> Result<(), hyper::Error> {
 	let backend = match mail_passwd::Service::new({
@@ -172,6 +180,7 @@ async fn main() -> Result<(), hyper::Error> {
 		.route("/", axum::routing::get(mainpage))
 		.route("/delete_password", axum::routing::post(delete_password))
 		.route("/create_password", axum::routing::post(create_password))
+		.route("/static/:filename", axum::routing::get(static_file_handler))
 		.with_state(Arc::new(backend));
 
 	let addr = std::net::SocketAddr::from(([127, 0, 0, 1], 3000));
