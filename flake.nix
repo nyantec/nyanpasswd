@@ -20,7 +20,15 @@
             pname = "mailtest-passwd";
             version =
               self.shortRev or "dirty-${toString self.lastModifiedDate}";
-            src = self;
+            src = nixpkgs.lib.cleanSourceWith {
+              filter = name: type: let
+                baseName = baseNameOf (toString name);
+              in
+                ! (
+                  nixpkgs.lib.hasSuffix ".nix" baseName
+                );
+              src = nixpkgs.lib.cleanSource ./.;
+            };
             cargoLock = {
               lockFile = ./Cargo.lock;
             };
@@ -42,6 +50,13 @@
       packages = forAllSystems (system: {
         inherit (nixpkgsFor.${system}) mailtest-passwd;
         default = self.packages.${system}.mailtest-passwd;
+      });
+
+      nixosModules.default = import ./configuration.nix self;
+      checks = forAllSystems (system: let
+        pkgs = (nixpkgsFor.${system});
+      in {
+        nixos-test = pkgs.nixosTest (import ./nixos-test.nix self);
       });
 
       devShells = forAllSystems (system: {
