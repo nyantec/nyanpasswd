@@ -1,9 +1,13 @@
 use axum::http::StatusCode;
 use axum::Form;
-use axum::{extract::{State, Path}, response::IntoResponse};
+use axum::{
+	extract::{Path, State},
+	response::IntoResponse,
+};
 use sailfish::TemplateOnce;
 use sqlx::postgres::PgPoolOptions;
 use std::sync::Arc;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 const COMPANY_NAME: &str = "nyantec GmbH";
 const IMPRESSUM: &str = "https://nyantec.com/impressum/";
@@ -152,27 +156,41 @@ async fn create_password(
 async fn static_file_handler(Path(filename): Path<String>) -> axum::response::Response {
 	match filename.as_str() {
 		"style.css" => (StatusCode::OK, [("Content-Type", "text/css")], STYLE_CSS).into_response(),
-		_ => StatusCode::NOT_FOUND.into_response()
+		_ => StatusCode::NOT_FOUND.into_response(),
 	}
 }
 
 #[tokio::main]
 async fn main() -> Result<(), hyper::Error> {
+	tracing_subscriber::Registry::default()
+		.with(tracing_subscriber::EnvFilter::from_default_env())
+		.with(tracing_subscriber::fmt::layer().json())
+		.init();
+
 	let backend = match mail_passwd::Service::new({
 		let database_url = match std::env::var("DATABASE_URL") {
-			Ok(val) => val,
+			Ok(val) => {
+				tracing::info!("Got database URL: {}", val);
+				val
+			}
 			Err(err) => panic!("DATABASE_URL not set or invalid: {}", err),
 		};
 
 		match PgPoolOptions::new().max_connections(5).connect(&database_url).await {
-			Ok(db) => db,
+			Ok(db) => {
+				tracing::info!("Connected to the database: {:?}", db);
+				db
+			}
 			Err(err) => panic!("Connection to the database failed: {}", err),
 		}
 	})
 	.run_migrations()
 	.await
 	{
-		Ok(backend) => backend,
+		Ok(backend) => {
+			tracing::info!("Constructed backend: {:?}", backend);
+			backend
+		}
 		Err(err) => panic!("Database migrations failed: {}", err),
 	};
 

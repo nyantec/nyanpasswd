@@ -17,6 +17,7 @@ sailfish = "0.5.0"
 async-trait = "0.1.60"
 regex = "1.7.0"
 lazy_static = "1.4.0"
+tracing-subscriber = { version = "0.3.16", features = ["env-filter", "json"] }
 [dependencies.chrono]
 version = "0.4.23"
 default-features = false

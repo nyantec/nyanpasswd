@@ -40,9 +40,13 @@ pub struct User {
 static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!();
 
 mod sealed {
+	use std::fmt::Debug;
+
+	#[derive(Debug)]
 	pub enum MigrationsDone {}
+	#[derive(Debug)]
 	pub enum Created {}
-	pub trait InitState {}
+	pub trait InitState: Debug {}
 	impl InitState for super::MigrationsDone {}
 	impl InitState for super::Created {}
 }
@@ -56,6 +60,15 @@ pub struct Service<S: sealed::InitState> {
 	_migrations: std::marker::PhantomData<S>,
 }
 
+// We implement Debug manually, because:
+// - Argon2<'a> doesn't implement Debug
+// - Showing the phantom data is absolutely useless here
+impl<T: sealed::InitState> std::fmt::Debug for Service<T> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("Service").field("db", &self.db).finish_non_exhaustive()
+	}
+}
+
 impl Service<Created> {
 	pub fn new(db: sqlx::PgPool) -> Self {
 		Self {
@@ -65,6 +78,7 @@ impl Service<Created> {
 		}
 	}
 
+	#[tracing::instrument]
 	pub async fn run_migrations(self) -> sqlx::Result<Service<MigrationsDone>> {
 		MIGRATOR.run(&self.db).await?;
 
@@ -78,6 +92,7 @@ impl Service<Created> {
 
 impl Service<MigrationsDone> {
 	/// Generate a password for a user designated by `user` and save it with the corresponding `label`.
+	#[tracing::instrument]
 	pub async fn new_password(
 		&self,
 		user: &User,
@@ -103,6 +118,7 @@ impl Service<MigrationsDone> {
 		Ok(password)
 	}
 	/// Irreversibly remove a password designated by `label` from the specified user.
+	#[tracing::instrument]
 	pub async fn rm_password_for(&self, user: &User, label: &str) -> sqlx::Result<()> {
 		sqlx::query("DELETE FROM passdb WHERE userid = $1 AND label = $2")
 			.bind(&user.id)
@@ -113,6 +129,7 @@ impl Service<MigrationsDone> {
 		Ok(())
 	}
 	/// List passwords owned by the current user.
+	#[tracing::instrument]
 	pub async fn list_passwords_for_username(&self, user: &str) -> sqlx::Result<Vec<Password>> {
 		sqlx::query_as::<_, Password>(
 			"SELECT passdb.* FROM passdb INNER JOIN userdb ON userdb.id = userid WHERE userdb.username = $1",
@@ -121,6 +138,8 @@ impl Service<MigrationsDone> {
 		.fetch_all(&self.db)
 		.await
 	}
+
+	#[tracing::instrument]
 	pub async fn list_passwords_for(&self, user: &User) -> sqlx::Result<Vec<Password>> {
 		sqlx::query_as::<_, Password>("SELECT passdb.* FROM passdb WHERE userid = $1")
 			.bind(user.id)
@@ -129,6 +148,7 @@ impl Service<MigrationsDone> {
 	}
 
 	/// Verify a password for a user identified by their username.
+	#[tracing::instrument]
 	pub async fn verify_password(&self, user: &str, password: &str) -> sqlx::Result<bool> {
 		let mut stream = sqlx::query_scalar::<_, String>(
 			"SELECT passdb.hash FROM passdb INNER JOIN userdb ON userid = userdb.id WHERE userdb.username = $1 AND userdb.login_allowed = true",
@@ -155,6 +175,7 @@ impl Service<MigrationsDone> {
 		Ok(false)
 	}
 	/// Resolve a user by its username.
+	#[tracing::instrument]
 	pub async fn find_user_by_name(&self, username: &str) -> sqlx::Result<Option<User>> {
 		match sqlx::query_as::<_, User>("SELECT * FROM userdb WHERE username = $1")
 			.bind(username)
@@ -167,10 +188,12 @@ impl Service<MigrationsDone> {
 		}
 	}
 	/// List all users.
+	#[tracing::instrument]
 	pub async fn list_users(&self) -> sqlx::Result<Vec<User>> {
 		sqlx::query_as::<_, User>("SELECT * FROM userdb").fetch_all(&self.db).await
 	}
 	/// Create a new user.
+	#[tracing::instrument]
 	pub async fn create_user(
 		&self,
 		username: &str,
@@ -183,6 +206,7 @@ impl Service<MigrationsDone> {
 			.await
 	}
 	/// Activate or deactivate a user's login capabilities.
+	#[tracing::instrument]
 	pub async fn set_user_login_allowed(&self, user: &str, login_allowed: bool) -> sqlx::Result<()> {
 		sqlx::query("UPDATE userdb SET login_allowed = $2 WHERE username = $1")
 			.bind(user)
