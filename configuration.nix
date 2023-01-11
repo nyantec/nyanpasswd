@@ -65,6 +65,14 @@ in {
         '';
       };
       dovecot2.enable = mkEnableOption "integration with Dovecot";
+      dovecot2.mailLocation = mkOption {
+        type = types.str;
+        default = "maildir:/var/vmail/";
+        example = "maildir:/persist/mail/";
+        description = mdDoc ''
+          The location to store mail of virtual users managed by mail-passwd in. The trailing slash must be present, as the UUID of the user will be appended to this string.
+        '';
+      };
     };
   };
 
@@ -116,6 +124,19 @@ in {
       };
     })
     (lib.mkIf (cfg.enable && cfg.dovecot2.enable) {
+      assertions = [
+        {
+          assertion = let
+            getLastChar = s: lib.strings.substring
+              ((lib.strings.stringLength s)-1)
+              ((lib.strings.stringLength s)-1)
+              s;
+            endsWith = c: s: (getLastChar s) == c;
+          in endsWith "/" cfg.dovecot2.mailLocation;
+          message = "services.mail-passwd.dovecot2.mailLocation must end with a slash";
+        }
+      ];
+
       systemd.services.dovecot2 = {
         wants = [ "mail-passwd.service" ];
       };
@@ -131,6 +152,7 @@ in {
           src = ./userdb.lua;
           lua_path = luaPath;
           lua_cpath = luaCPath;
+          maildir_location = cfg.dovecot2.mailLocation;
         };
       in ''
         userdb {

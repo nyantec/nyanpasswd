@@ -32,12 +32,7 @@ function auth_password_verify(request, password)
    elseif resp_status == 403 then
 	  return dovecot.status.PASSDB_RESULT_USER_DISABLED, "user login disabled by administrator request"
    elseif resp_status == 401 then
-	  local payload = auth_response:payload()
-	  if payload == "expired" then
-		 return dovecot.status.PASSDB_RESULT_PASS_EXPIRED, "password expired"
-	  else
-		 return dovecot.status.PASSDB_RESULT_PASSWORD_MISMATCH, "no password matches provided password"
-	  end
+	  return dovecot.status.PASSDB_RESULT_PASSWORD_MISMATCH, "no (non-expired) password matches provided password"
    elseif resp_status == 500 then
 	  return dovecot.status.PASSDB_RESULT_INTERNAL_FAILURE, auth_response:payload()
    else
@@ -57,9 +52,11 @@ function auth_userdb_lookup(request)
    lookup_request:set_payload(json.encode(req))
    local lookup_response = lookup_request:submit()
    local status = lookup_response:status()
-   local payload = lookup_request:payload()
    if status == 200 then
-	  return dovecot.status.USERDB_RESULT_OK, json.decode(payload)
+	  local user = json.decode(lookup_request:payload())
+	  local maildir_location = "@maildir_location@" .. payload.id
+
+	  return dovecot.status.USERDB_RESULT_OK, { mail_location = maildir_location }
    elseif status == 404 then
 	  return dovecot.status.USERDB_RESULT_USER_UNKNOWN, payload
    else
