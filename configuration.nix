@@ -101,7 +101,7 @@ in {
                            "postgres://localhost?dbname=mailpasswd&host=/run/postgresql"
                          else
                            cfg.databaseUri;
-          ADMIN_UIDS = lib.concatSepStrings " " cfg.adminUids;
+          ADMIN_UIDS = lib.concatStringsSep " " cfg.adminUids;
         };
       };
     })
