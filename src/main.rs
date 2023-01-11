@@ -160,6 +160,8 @@ async fn static_file_handler(Path(filename): Path<String>) -> axum::response::Re
 	}
 }
 
+mod admin;
+
 #[tokio::main]
 async fn main() -> Result<(), hyper::Error> {
 	tracing_subscriber::Registry::default()
@@ -189,7 +191,7 @@ async fn main() -> Result<(), hyper::Error> {
 	{
 		Ok(backend) => {
 			tracing::info!("Constructed backend: {:?}", backend);
-			backend
+			Arc::new(backend)
 		}
 		Err(err) => panic!("Database migrations failed: {}", err),
 	};
@@ -199,7 +201,8 @@ async fn main() -> Result<(), hyper::Error> {
 		.route("/delete_password", axum::routing::post(delete_password))
 		.route("/create_password", axum::routing::post(create_password))
 		.route("/static/:filename", axum::routing::get(static_file_handler))
-		.with_state(Arc::new(backend));
+		.nest_service("/admin", admin::router(backend.clone()))
+		.with_state(backend);
 
 	let addr = std::net::SocketAddr::from(([127, 0, 0, 1], 3000));
 	hyper::server::Server::bind(&addr).serve(app.into_make_service()).await

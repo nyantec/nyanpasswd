@@ -1,0 +1,26 @@
+<!-- -*- mode: mhtml -*- -->
+<main>
+  <a href="/admin/">Go to admin dashboard</a>
+  <section>
+	<form id="manage_user" class="major" method="POST">
+	  <h2>Manage user <code><%= user.username %></code></h2>
+
+	  <input type="hidden" name="uid" id="uid" value="<%= user.id.to_string() %>">
+
+	  <% if let Some(expires_at) = user.expires_at { %>
+	  <p>Expiration date: <time datetime="<%= expires_at.to_rfc3339() %>"><%= expires_at.to_string() %></time></p>
+	  <% } else { %>
+	  <p>This user account is set to never expire.</p>
+	  <% } %>
+	  <input is="nyantec-datepicker" name="expires_at" id="expires_at" value="<%= user.expires_at.map(|s| s.to_rfc3339()).unwrap_or_default() %>">
+	  <input type="submit" formaction="/admin/expire_user" value="Set expiration date">
+
+	  <span>
+		<input type="checkbox" disabled <% if user.login_allowed { %>checked<% } %>>
+		<span>Login allowed</span>
+	  </span>
+
+	  <input type="submit" formaction="/admin/deactivate_user" value="Toggle">
+	</form>
+  </section>
+</main>

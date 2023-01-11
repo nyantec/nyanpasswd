@@ -1,0 +1,63 @@
+<!-- -*- mode: mhtml -*- -->
+<main>
+  <p>Welcome to the admin UI.</p>
+
+  <section>
+	<h2>Currently registered users</h2>
+	<table>
+	  <thead>
+		<tr>
+		  <th>Username</th>
+		  <th>Can log in?</th>
+		  <th>Created at</th>
+		  <th>Expires at</th>
+		</tr>
+	  </thead>
+	  <tbody>
+		<% for user in users { %>
+		<tr>
+		  <td>
+			<a href="/admin/manage_user?uid=<%= user.id.to_string() %>">
+			  <%= user.username %>
+			</a>
+		  </td>
+		  <td>
+			<input type="checkbox" disabled <% if user.login_allowed { %>checked<% } %>>
+		  </td>
+		  <td>
+			<time datetime="<%= user.created_at.to_rfc3339() %>">
+			  <%= user.created_at.to_string() %>
+			</time>
+		  </td>
+		  <td><%-
+				user.expires_at.map(|i| {
+				format!("<time datetime=\"{}\">{}</time>", i.to_rfc3339(), i.to_string())
+				}).unwrap_or_else(|| "No expiry".to_string())
+				%>
+		  </td>
+		</tr>
+		<% } %>
+	  </tbody>
+	</table>
+  </section>
+
+  <section>
+	<form id="new_user" class="major" method="POST" action="/admin/create_user">
+	  <h2>Register a new user</h2>
+	  <p>
+		Note: To access the password management interface, the user in question
+		must have a TLS client certificate issued to them with the
+		<code>UID</code> field in the <code>DN</code> matching the username
+		you'll enter below.
+	  </p>
+
+	  <label for="username">Username:</label>
+	  <input id="username" name="username" required>
+
+	  <label for="expires_at">Expires at:</label>
+	  <input name="expires_at" is="nyantec-datetime">
+
+	  <input type="submit" value="Register">
+	</form>
+  </section>
+</main>

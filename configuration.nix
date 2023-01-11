@@ -46,7 +46,7 @@ in {
           validated.
         '';
       };
-      /*adminUids = mkOption {
+      adminUids = mkOption {
         type = types.listOf types.str;
         default = [];
         example = ["mvs" "mak" "vsh"];
@@ -54,7 +54,7 @@ in {
           A list of UIDs that will be granted access to the
           administrative functions.
         '';
-      };*/
+      };
       user = mkOption {
         type = types.nullOr types.str;
         example = "mailpasswd";
@@ -101,6 +101,7 @@ in {
                            "postgres://localhost?dbname=mailpasswd&host=/run/postgresql"
                          else
                            cfg.databaseUri;
+          ADMIN_UIDS = lib.concatSepStrings " " cfg.adminUids;
         };
       };
     })
