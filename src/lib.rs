@@ -220,10 +220,9 @@ impl Service<MigrationsDone> {
 	}
 	/// Activate or deactivate a user's login capabilities.
 	#[tracing::instrument]
-	pub async fn set_user_login_allowed(&self, user: &str, login_allowed: bool) -> sqlx::Result<()> {
-		sqlx::query("UPDATE userdb SET login_allowed = $2 WHERE username = $1")
+	pub async fn toggle_user_login_allowed(&self, user: Uuid) -> sqlx::Result<()> {
+		sqlx::query("UPDATE userdb SET login_allowed = NOT login_allowed WHERE id = $1")
 			.bind(user)
-			.bind(login_allowed)
 			.execute(&self.db)
 			.await?;
 
@@ -294,9 +293,13 @@ mod test {
 		// Check that they can log in
 		assert!(svc.verify_password("vsh", &password).await?);
 		// Disallow this user to log in
-		svc.set_user_login_allowed("vsh", false).await?;
+		svc.toggle_user_login_allowed(uuid).await?;
 		// Check they can't log in
 		assert!(!svc.verify_password("vsh", &password).await?);
+		// Allow this user back
+		svc.toggle_user_login_allowed(uuid).await?;
+		// Ensure they're able to log in again
+		assert!(svc.verify_password("vsh", &password).await?);
 
 		Ok(())
 	}
