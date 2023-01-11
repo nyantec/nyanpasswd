@@ -73,14 +73,21 @@ pub enum CertDnExtractionError {
 	ReverseProxyMisconfigured,
 }
 
+impl From<&CertDnExtractionError> for StatusCode {
+    fn from(err: &CertDnExtractionError) -> Self {
+		use CertDnExtractionError::*;
+        match err {
+			CertValidationFailed(_) => StatusCode::FORBIDDEN,
+			ReverseProxyMisconfigured => StatusCode::INTERNAL_SERVER_ERROR,
+			NoTlsCert => StatusCode::UNAUTHORIZED,
+		}
+    }
+}
+
 impl IntoResponse for CertDnExtractionError {
 	fn into_response(self) -> Response {
 		(
-			match &self {
-				Self::CertValidationFailed(_) => StatusCode::FORBIDDEN,
-				Self::ReverseProxyMisconfigured => StatusCode::INTERNAL_SERVER_ERROR,
-				Self::NoTlsCert => StatusCode::UNAUTHORIZED,
-			},
+			StatusCode::from(&self),
 			[("Content-Type", "text/plain")],
 			match &self {
 				Self::ReverseProxyMisconfigured => ERROR_MESSAGE_TLS_PROXY_MISCONFIGURED.to_string(),
@@ -102,20 +109,21 @@ pub enum UserExtractionError {
 	#[error("Error parsing TLS client certificate data")]
 	Certificate(#[from] CertDnExtractionError)
 }
-
+impl From<&UserExtractionError> for StatusCode {
+    fn from(err: &UserExtractionError) -> Self {
+		use UserExtractionError::*;
+        match err {
+			Sql(_) => StatusCode::INTERNAL_SERVER_ERROR,
+			UserNotFound => StatusCode::UNAUTHORIZED,
+			NoUidFieldInCert => StatusCode::BAD_REQUEST,
+			Certificate(err) => StatusCode::from(err),
+		}
+    }
+}
 impl IntoResponse for UserExtractionError {
 	fn into_response(self) -> Response {
-		if let Self::Certificate(err) = self {
-			return err.into_response();
-		}
-
 		(
-			match &self {
-				Self::Sql(_) => StatusCode::INTERNAL_SERVER_ERROR,
-				Self::UserNotFound => StatusCode::UNAUTHORIZED,
-				Self::NoUidFieldInCert => StatusCode::BAD_REQUEST,
-				_ => unreachable!()
-			},
+			StatusCode::from(&self),
 			[("Content-Type", "text/plain")],
 			self.to_string(),
 		)
@@ -131,12 +139,13 @@ impl FromRequestParts<Arc<Service<MigrationsDone>>> for User {
 		match CertDn::from_request_parts(parts, db).await {
 			Ok(cert_dn) => match cert_dn.uid() {
 				Some(uid) => match db.find_user_by_name(uid).await {
-					Ok(Some(user)) => return Ok(user),
-					Ok(None) => return Err(UserExtractionError::UserNotFound),
-					Err(err) => return Err(UserExtractionError::Sql(err)),
+					Ok(Some(user)) => Ok(user),
+					Ok(None) => Err(UserExtractionError::UserNotFound),
+					Err(err) => Err(UserExtractionError::Sql(err)),
 				},
-				None => return Err(UserExtractionError::NoUidFieldInCert)
+				None => Err(UserExtractionError::NoUidFieldInCert)
 			},
+			#[cfg_attr(debug_assertions, allow(unused_variables))]
 			Err(err) => {
 				#[cfg(debug_assertions)]
 				return Ok(db.find_user_by_name("vsh").await?.unwrap());
