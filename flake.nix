@@ -63,7 +63,7 @@
         default = nixpkgsFor.${system}.mkShell {
           inputsFrom = [ self.packages.${system}.default ];
           nativeBuildInputs = with nixpkgsFor.${system}; [
-            rustfmt sqlx-cli rust-analyzer clippy
+            rustfmt sqlx-cli rust-analyzer clippy cargo-watch
           ];
 
           shellHook = ''
