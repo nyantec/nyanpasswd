@@ -2,6 +2,10 @@
 <main>
   <p>You are logged in as: <code><%= user.username %></code></p>
 
+  <% if is_admin { %>
+  <p>You are an administrator. <a href="/admin/">Click here</a> to go to the administrative dashboard.</p>
+  <% } %>
+  
   <section>
 	<h2>Your passwords</h2>
     <% if passwords.is_empty() { %>

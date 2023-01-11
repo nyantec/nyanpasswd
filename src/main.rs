@@ -1,3 +1,4 @@
+#![deny(dead_code)]
 use axum::http::StatusCode;
 use axum::Form;
 use axum::{
@@ -24,6 +25,7 @@ struct Layout<B: TemplateOnce> {
 #[derive(TemplateOnce)]
 #[template(path = "main.stpl")]
 struct MainPage {
+	is_admin: bool,
 	user: mail_passwd::User,
 	passwords: Vec<mail_passwd::Password>,
 }
@@ -39,11 +41,16 @@ struct NewPasswordPage {
 struct DeletedPasswordPage;
 
 type Service = mail_passwd::Service<mail_passwd::MigrationsDone>;
-async fn mainpage(State(backend): State<Arc<Service>>, user: mail_passwd::User) -> axum::response::Response {
+async fn mainpage(
+	State(backend): State<Arc<Service>>,
+	admin: Option<admin::Admin>,
+	user: mail_passwd::User
+) -> axum::response::Response {
 	axum::response::Html(
 		Layout {
 			company_name: COMPANY_NAME,
 			body: MainPage {
+				is_admin: admin.is_some(),
 				passwords: match backend.list_passwords_for(&user).await {
 					Ok(passwords) => passwords,
 					Err(err) => {
