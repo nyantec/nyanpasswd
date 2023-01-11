@@ -1,3 +1,10 @@
+if not string.find(package.path, "@lua_path@") then
+   package.path = "@lua_path@;" .. package.path;
+end
+if not string.find(package.cpath, "@lua_cpath@") then
+   package.cpath = "@lua_cpath@;" .. package.cpath;
+end
+
 local json = require "rapidjson"
 local http_client = dovecot.http.client {
     timeout = 5000;
@@ -33,6 +40,8 @@ function auth_password_verify(request, password)
 	  end
    elseif resp_status == 500 then
 	  return dovecot.status.PASSDB_RESULT_INTERNAL_FAILURE, auth_response:payload()
+   else
+	  return dovecot.status.PASSDB_RESULT_INTERNAL_FAILURE, "service returned " .. resp_status
    end
 end
 

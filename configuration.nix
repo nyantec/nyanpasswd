@@ -120,15 +120,27 @@ in {
         wants = [ "mail-passwd.service" ];
       };
 
-      services.dovecot2.extraConfig = ''
+      services.dovecot2.extraConfig = let
+        makeLuaPath = subDir: paths: concatStringsSep ";" (map (path: path + "/" + subDir) (filter (x: x != null) paths));
+        packages = with pkgs.lua53Packages; [
+          rapidjson
+        ];
+        luaPath = (makeLuaPath "lib/lua/5.3/?.lua" packages);
+        luaCPath = (makeLuaPath "lib/lua/5.3/?.so" packages);
+        userdb = pkgs.substituteAll {
+          src = ./userdb.lua;
+          lua_path = luaPath;
+          lua_cpath = luaCPath;
+        };
+      in ''
         userdb {
           driver = lua
-          args = file=${./userdb.lua}
+          args = file=${userdb}
         }
 
         passdb {
           driver = lua
-          args = file=${./userdb.lua}
+          args = file=${userdb}
         }
       '';
       # they removed `services.dovecot2.package`...
@@ -136,11 +148,6 @@ in {
         dovecot = prev.dovecot.override { withLua = true; };
         mail-passwd = self.packages.${config.nixpkgs.localSystem.system}.default;
       })];
-      systemd.services.dovecot2 = {
-        environment.LUA_PATH = lib.makeSearchPath "/lib/lua/5.3" (with pkgs.lua53Packages; [
-          rapidjson
-        ]);
-      };
     })
     (lib.mkIf (cfg.enable && cfg.databaseUri == null) {
       systemd.services.mail-passwd = {

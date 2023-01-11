@@ -25,7 +25,7 @@
                 baseName = baseNameOf (toString name);
               in
                 ! (
-                  nixpkgs.lib.hasSuffix ".nix" baseName
+                  nixpkgs.lib.hasSuffix ".nix" baseName || nixpkgs.lib.hasSuffix ".lua" baseName
                 );
               src = nixpkgs.lib.cleanSource ./.;
             };
