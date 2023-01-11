@@ -28,7 +28,7 @@ pub struct Password {
 	pub expires_at: Option<chrono::DateTime<chrono::FixedOffset>>,
 }
 
-#[derive(sqlx::FromRow, Debug)]
+#[derive(sqlx::FromRow, Debug, serde::Serialize)]
 pub struct User {
 	pub id: Uuid,
 	pub username: String,
@@ -67,6 +67,13 @@ impl<T: sealed::InitState> std::fmt::Debug for Service<T> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		f.debug_struct("Service").field("db", &self.db).finish_non_exhaustive()
 	}
+}
+
+pub enum AuthenticationResult {
+	Ok,
+	NoSuchUser,
+	LoginDisabled,
+	IncorrectPassword
 }
 
 impl Service<Created> {
@@ -149,9 +156,30 @@ impl Service<MigrationsDone> {
 
 	/// Verify a password for a user identified by their username.
 	#[tracing::instrument]
-	pub async fn verify_password(&self, user: &str, password: &str) -> sqlx::Result<bool> {
+	pub async fn verify_password(&self, user: &str, password: &str) -> sqlx::Result<AuthenticationResult> {
+		// First, wrap things in a transaction. This is because we need extreme granularity in
+		// errors that might be hard to do in a single SELECT statement, but with multiple SELECT
+		// statements, we need consistency. This is provided by REPEATABLE READ transaction
+		// isolation level.
+		//
+		// See <https://www.postgresql.org/docs/current/transaction-iso.html> for more info.
+		let mut txn = self.db.begin().await?;
+		sqlx::query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY").execute(&mut txn).await?;
+		// First, check if user exists and is allowed to log in.
+		match sqlx::query_as::<_, (bool,)>("SELECT login_allowed FROM userdb WHERE username = $1")
+			.bind(user)
+			.fetch_optional(&mut txn)
+			.await
+		{
+			Ok(Some((login_allowed,))) => if !login_allowed {
+				return Ok(AuthenticationResult::LoginDisabled);
+			},
+			Ok(None) => return Ok(AuthenticationResult::NoSuchUser),
+			Err(err) => return Err(err)
+		};
+
 		let mut stream = sqlx::query_scalar::<_, String>(
-			"SELECT passdb.hash FROM passdb INNER JOIN userdb ON userid = userdb.id WHERE userdb.username = $1 AND userdb.login_allowed = true",
+			"SELECT passdb.hash FROM passdb INNER JOIN userdb ON userid = userdb.id WHERE userdb.username = $1",
 		)
 		.bind(user)
 		.fetch_many(&self.db);
@@ -164,41 +192,35 @@ impl Service<MigrationsDone> {
 						.verify_password(password.as_bytes(), &PasswordHash::new(&hash).expect("hash should be valid"))
 						.is_ok()
 					{
-						return Ok(true);
+						txn.commit().await?;
+						return Ok(AuthenticationResult::Ok);
 					}
 				}
-				Err(err) => return Err(err),
+				Err(err) => {
+					txn.commit().await?;
+					return Err(err);
+				},
 				Ok(sqlx::Either::Left(_query_result)) => {}
 			}
 		}
-
-		Ok(false)
+		txn.commit().await?;
+		Ok(AuthenticationResult::IncorrectPassword)
 	}
 	/// Resolve a user by its username.
 	#[tracing::instrument]
 	pub async fn find_user_by_name(&self, username: &str) -> sqlx::Result<Option<User>> {
-		match sqlx::query_as::<_, User>("SELECT * FROM userdb WHERE username = $1")
+		sqlx::query_as::<_, User>("SELECT * FROM userdb WHERE username = $1")
 			.bind(username)
-			.fetch_one(&self.db)
+			.fetch_optional(&self.db)
 			.await
-		{
-			Ok(user) => Ok(Some(user)),
-			Err(sqlx::error::Error::RowNotFound) => Ok(None),
-			Err(err) => Err(err),
-		}
 	}
 	/// Find a user by its static neverchanging UUID.
 	#[tracing::instrument]
 	pub async fn get_user_by_id(&self, uuid: Uuid) -> sqlx::Result<Option<User>> {
-		match sqlx::query_as::<_, User>("SELECT * FROM userdb WHERE id = $1")
+		sqlx::query_as::<_, User>("SELECT * FROM userdb WHERE id = $1")
 			.bind(uuid)
-			.fetch_one(&self.db)
+			.fetch_optional(&self.db)
 			.await
-		{
-			Ok(user) => Ok(Some(user)),
-			Err(sqlx::error::Error::RowNotFound) => Ok(None),
-			Err(err) => Err(err),
-		}
 	}
 	/// List all users.
 	#[tracing::instrument]
@@ -247,6 +269,8 @@ impl Service<MigrationsDone> {
 
 #[cfg(test)]
 mod test {
+	use super::AuthenticationResult;
+
 	fn create_service(pool: sqlx::PgPool) -> crate::Service<super::MigrationsDone> {
 		// Note: you are DEFINITELY NOT SUPPOSED to be creating this
 		// object like that! SQLx test harness automatically applies
@@ -271,26 +295,26 @@ mod test {
 
 		// Check that no passwords are defined
 		assert_eq!(svc.list_passwords_for(&user).await?.len(), 0);
-		assert!(!svc.verify_password(&user.username, "AAAAAAAA").await?);
+		assert!(matches!(svc.verify_password(&user.username, "AAAAAAAA").await?, AuthenticationResult::IncorrectPassword));
 		// Generate a password and ensure it matches
 		let password = svc.new_password(&user, "longiflorum", None).await?;
 		assert_eq!(svc.list_passwords_for(&user).await?.len(), 1);
-		assert!(svc.verify_password(&user.username, &password).await?);
+		assert!(matches!(svc.verify_password(&user.username, &password).await?, AuthenticationResult::Ok));
 		// Ensure something else isn't accepted
-		assert!(!svc.verify_password(&user.username, "AAAAAAAA").await?);
+		assert!(matches!(svc.verify_password(&user.username, "AAAAAAAA").await?, AuthenticationResult::IncorrectPassword));
 		// Ensure non-unique labels are rejected for the same user
 		svc.new_password(&user, "longiflorum", None).await.unwrap_err();
 		// Generate another password and check if it works
 		let another_password = svc.new_password(&user, "primrose", None).await?;
 		assert_eq!(svc.list_passwords_for(&user).await?.len(), 2);
-		assert!(svc.verify_password(&user.username, &another_password).await?);
+		assert!(matches!(svc.verify_password(&user.username, &another_password).await?, AuthenticationResult::Ok));
 		// Check that the older password still works
-		assert!(svc.verify_password(&user.username, &password).await?);
+		assert!(matches!(svc.verify_password(&user.username, &password).await?, AuthenticationResult::Ok));
 		// Remove a password
 		svc.rm_password_for(&user, "longiflorum").await?;
 		assert_eq!(svc.list_passwords_for(&user).await?.len(), 1);
-		assert!(!svc.verify_password(&user.username, &password).await?);
-		assert!(svc.verify_password(&user.username, &another_password).await?);
+		assert!(matches!(svc.verify_password(&user.username, &password).await?, AuthenticationResult::IncorrectPassword));
+		assert!(matches!(svc.verify_password(&user.username, &another_password).await?, AuthenticationResult::Ok));
 
 		Ok(())
 	}
@@ -306,15 +330,15 @@ mod test {
 		// Create a password for them
 		let password = svc.new_password(&user, "longiflorum", None).await?;
 		// Check that they can log in
-		assert!(svc.verify_password("vsh", &password).await?);
+		assert!(matches!(svc.verify_password("vsh", &password).await?, AuthenticationResult::Ok));
 		// Disallow this user to log in
 		svc.toggle_user_login_allowed(uuid).await?;
 		// Check they can't log in
-		assert!(!svc.verify_password("vsh", &password).await?);
+		assert!(matches!(svc.verify_password("vsh", &password).await?, AuthenticationResult::LoginDisabled));
 		// Allow this user back
 		svc.toggle_user_login_allowed(uuid).await?;
 		// Ensure they're able to log in again
-		assert!(svc.verify_password("vsh", &password).await?);
+		assert!(matches!(svc.verify_password("vsh", &password).await?, AuthenticationResult::Ok));
 
 		Ok(())
 	}

@@ -168,6 +168,7 @@ async fn static_file_handler(Path(filename): Path<String>) -> axum::response::Re
 }
 
 mod admin;
+mod api;
 
 #[tokio::main]
 async fn main() -> Result<(), hyper::Error> {
@@ -209,6 +210,7 @@ async fn main() -> Result<(), hyper::Error> {
 		.route("/create_password", axum::routing::post(create_password))
 		.route("/static/:filename", axum::routing::get(static_file_handler))
 		.nest_service("/admin", admin::router(backend.clone()))
+		.nest_service("/api", api::router(backend.clone()))
 		.with_state(backend);
 
 	let addr = std::net::SocketAddr::from(([127, 0, 0, 1], 3000));
