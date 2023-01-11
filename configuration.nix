@@ -67,7 +67,7 @@ in {
       dovecot2.enable = mkEnableOption "integration with Dovecot";
       dovecot2.mailLocation = mkOption {
         type = types.str;
-        default = "maildir:/var/vmail/";
+        default = "maildir:/var/spool/mail/";
         example = "maildir:/persist/mail/";
         description = mdDoc ''
           The location to store mail of virtual users managed by mail-passwd in. The trailing slash must be present, as the UUID of the user will be appended to this string.

@@ -1,3 +1,11 @@
+# Note: Use the following to quickly jump to the juicy parts:
+#
+# ```python
+# serial_stdout_off()
+# server.wait_for_unit("default.target")
+# serial_stdout_on()
+# exec("\n".join(driver.tests.splitlines()[0:13]))
+# ```
 self:
 { lib, ... }: {
   name = "nixos-mail-passwd";
@@ -18,6 +26,9 @@ self:
 
       services.dovecot2 = {
         enable = true;
+        extraConfig = ''
+          log_debug = event=*
+        '';
       };
 
       # We disable nginx since we'll access the service directly
@@ -41,6 +52,6 @@ self:
         print("Generated password:", password)
 
     with subtest("Check that IMAP authentication works:"):
-        server.succeed(f"curl --silent --fail imap://localhost:143/ -u vsh:{password}")
+        server.succeed(f"curl -vvvvvvv --no-progress-meter imap://localhost:143/ -u vsh:{password}")
   '';
 }
