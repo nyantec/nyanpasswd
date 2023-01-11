@@ -1,11 +1,13 @@
-<!-- -*- mode: mhtml-mode -*- -->
+<!-- -*- mode: mhtml -*- -->
 <main>
   <p>You are logged in as: <code><%= user.username %></code></p>
 
   <section>
 	<h2>Your passwords</h2>
+    <% if passwords.is_empty() { %>
+	<p>You have no passwords at the moment.</p>
+	<% } else { %>
 	<table>
-	  <% if passwords.len() > 0 { %>
 	  <thead>
 		<tr>
 		  <th colspan="2">Label</th>
@@ -36,12 +38,10 @@
 		<% } %>
 	  </tbody>
 	</table>
-	<% } else { %>
-	<p>You have no passwords at the moment.</p>
 	<% } %>
   </section>
   <section>
-	<form id="create_password" method="POST" action="/create_password">
+	<form id="create_password" class="major" method="POST" action="/create_password">
 	  <h2>Create new password</h2>
 	  <label for="label">Password label:</label><input id="label" name="label" required>
 	  

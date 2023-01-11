@@ -1,3 +1,7 @@
+* {
+	box-sizing: border-box;
+}
+
 body {
 	padding: 0;
 	margin: 0;
@@ -27,7 +31,7 @@ main > * + * {
 	margin-top: .75em;
 }
 
-form#create_password {
+form.major {
 	max-width: min(100%, 600px);
 	display: grid;
 	grid-template-columns: 1fr 2fr;
@@ -35,19 +39,20 @@ form#create_password {
 	gap: .75em;
 }
 
-form#create_password > h2 {
+form.major > h2, form.major > p {
 	grid-column: 1 / 3;
 }
 
-form#create_password input[type="submit"] {
+form.major input[type="submit"] {
 	display: block;
 	max-width: 20ch;
 	margin-left: auto;
 	margin-right: auto;
 }
 main > section > table  {
-	width: 100%;
 	margin: .75em;
+	/* Tables are absolutely cursed and don't obey normal rules */
+	width: calc(100% - calc(.75em * 2));
 }
 code {
 	/* Compensate for the monospace fonts often being smaller */
