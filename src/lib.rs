@@ -187,6 +187,19 @@ impl Service<MigrationsDone> {
 			Err(err) => Err(err),
 		}
 	}
+	/// Find a user by its static neverchanging UUID.
+	#[tracing::instrument]
+	pub async fn get_user_by_id(&self, uuid: Uuid) -> sqlx::Result<Option<User>> {
+		match sqlx::query_as::<_, User>("SELECT * FROM userdb WHERE id = $1")
+			.bind(uuid)
+			.fetch_one(&self.db)
+			.await
+		{
+			Ok(user) => Ok(Some(user)),
+			Err(sqlx::error::Error::RowNotFound) => Ok(None),
+			Err(err) => Err(err),
+		}
+	}
 	/// List all users.
 	#[tracing::instrument]
 	pub async fn list_users(&self) -> sqlx::Result<Vec<User>> {
