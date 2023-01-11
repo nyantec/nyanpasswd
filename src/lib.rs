@@ -228,6 +228,21 @@ impl Service<MigrationsDone> {
 
 		Ok(())
 	}
+	/// Set user expiry date.
+	#[tracing::instrument]
+	pub async fn set_user_expiry_date(
+		&self,
+		user: Uuid,
+		expires_at: Option<chrono::DateTime<chrono::FixedOffset>>
+	) -> sqlx::Result<()> {
+		sqlx::query("UPDATE userdb SET expires_at = $2 WHERE id = $1")
+			.bind(user)
+			.bind(expires_at)
+			.execute(&self.db)
+			.await?;
+
+		Ok(())
+	}
 }
 
 #[cfg(test)]
