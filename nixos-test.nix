@@ -26,14 +26,21 @@ self:
   };
 
   testScript = ''
+    import time
     server.wait_for_unit("default.target")
+    # XXX workaround for flaky test, replace by checking for open port on localhost
+    time.sleep(1)    
     vsh = "O = nyantec GmbH, CN = Vika Shleina, GN = Viktoriya, SN = Shleina, pseudonym = Vika, UID = vsh"
     mvs = "O = nyantec GmbH, CN = Mikael Voss, GN = Mikael, SN = Voss, UID = mvs"
 
-    server.succeed(f"curl --fail -H 'X-Ssl-Verify: SUCCESS' -H 'X-Ssl-Client-Dn: {vsh}' http://localhost:3000/")
+    with subtest("Check that user creation works when admin doesn't have an account"):
+        server.succeed(f"curl --fail -H 'X-Ssl-Verify: SUCCESS' -H 'X-Ssl-Client-Dn: {mvs}' http://localhost:3000/admin/create_user -d username=vsh -d expires_at=\"\"")
 
-    password = server.succeed(f"curl --silent --fail -H 'X-Ssl-Verify: SUCCESS' -H 'X-Ssl-Client-Dn: {vsh}' -d label=test -d expires_in=noexpiry https://localhost:3000/create_password").strip()
+    with subtest("Check that passwords can be generated"):
+        password = server.succeed(f"curl --silent --fail -H 'X-Ssl-Verify: SUCCESS' -H 'X-Ssl-Client-Dn: {vsh}' -d label=test -d expires_in=noexpiry http://localhost:3000/create_password | grep -o '<code>[^<]*</code>' | cut -b7- | cut -d'<' -f1").strip()
+        print("Generated password:", password)
 
-    server.succeed(f"curl --silent --fail imap://localhost:143/ -u vsh:{password}")
+    with subtest("Check that IMAP authentication works:"):
+        server.succeed(f"curl --silent --fail imap://localhost:143/ -u vsh:{password}")
   '';
 }
