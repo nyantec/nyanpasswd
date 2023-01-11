@@ -14,7 +14,7 @@ local http_client = dovecot.http.client {
 
 function auth_password_verify(request, password)
    local auth_request = http_client:request {
-	  url = "http://localhost:3000/api/authenticate/";
+	  url = "http://localhost:3000/api/authenticate";
 	  method = "POST";
    }
    local req = {
@@ -47,7 +47,7 @@ end
 
 function auth_userdb_lookup(request)
    local lookup_request = http_client:request {
-	  url = "http://localhost:3000/api/user_lookup/";
+	  url = "http://localhost:3000/api/user_lookup";
 	  -- Note: it would be more idiomatic to use GET here.  However,
 	  -- it seems that Dovecot lacks facilities for urlencoding things.
 	  -- This is bad, so we use JSON and POST here.
