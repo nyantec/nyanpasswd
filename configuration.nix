@@ -95,6 +95,8 @@ in {
         };
         extraConfig = ''
           ssl_verify_client on;
+          ssl_client_certificate ${cfg.rootCACertificate};
+          ssl_crl ${cfg.crlFile};
         '';
       };
       systemd.services.mail-passwd = {
