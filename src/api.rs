@@ -41,7 +41,10 @@ struct LookupForm {
 /// Look up a user in the database and return some info about it. Return 404 if the user does not exist.
 async fn lookup_user(State(db): State<Arc<Service>>, Json(form): Json<LookupForm>) -> Response {
 	match db.find_user_by_name(&form.user).await {
-		Ok(Some(user)) => axum::response::Json(user).into_response(),
+		Ok(Some(user)) => {
+			tracing::debug!("Replying with user data for {}: {:#?}", form.user, user);
+			axum::response::Json(user).into_response()
+		},
 		Ok(None) => StatusCode::NOT_FOUND.into_response(),
 		Err(err) => {
 			tracing::error!("Error looking up user: {}", err);
