@@ -18,7 +18,7 @@ function auth_password_verify(request, password)
 	  method = "POST";
    }
    local req = {
-	  user = request.user,
+	  user = request.username,
 	  password = password
    }
    auth_request:add_header("Content-Type", "application/json")
@@ -50,7 +50,7 @@ function auth_userdb_lookup(request)
 	  -- This is bad, so we use JSON and POST here.
 	  method = "POST";
    };
-   local req = { user = request.user }
+   local req = { user = request.username }
    lookup_request:add_header("Content-Type", "application/json")
    lookup_request:set_payload(json.encode(req))
    local lookup_response = lookup_request:submit()
