@@ -21,18 +21,18 @@ pub struct CertDn(String);
 impl CertDn {
 	/// Parse the UID out of a client certificate DN.
 	pub fn uid(&self) -> Option<&str> {
-		DN_UID_REGEX.captures(&self.0)
-			.map(|c| c.get(1).unwrap().as_str())
+		DN_UID_REGEX.captures(&self.0).map(|c| c.get(1).unwrap().as_str())
 	}
 }
 
 #[async_trait::async_trait]
-impl<T> FromRequestParts<T> for CertDn where
-    T: Send + Sync
+impl<T> FromRequestParts<T> for CertDn
+where
+	T: Send + Sync,
 {
-    type Rejection = CertDnExtractionError;
+	type Rejection = CertDnExtractionError;
 
-    async fn from_request_parts(parts: &mut Parts, _: &T) -> Result<Self, Self::Rejection> {
+	async fn from_request_parts(parts: &mut Parts, _: &T) -> Result<Self, Self::Rejection> {
 		match parts
 			.headers
 			.get("X-SSL-Verify")
@@ -46,7 +46,9 @@ impl<T> FromRequestParts<T> for CertDn where
 			Some(failed) => return Err(CertDnExtractionError::CertValidationFailed(failed.to_owned())),
 			None => {
 				#[cfg(debug_assertions)]
-				return Ok(CertDn("O = nyantec GmbH, CN = Vika Shleina, GN = Viktoriya, SN = Shleina, pseudonym = Vika, UID = vsh".to_string()));
+				return Ok(CertDn(
+					"O = nyantec GmbH, CN = Vika Shleina, GN = Viktoriya, SN = Shleina, pseudonym = Vika, UID = vsh".to_string(),
+				));
 				#[cfg(not(debug_assertions))]
 				return Err(CertDnExtractionError::ReverseProxyMisconfigured);
 			}
@@ -56,11 +58,11 @@ impl<T> FromRequestParts<T> for CertDn where
 			.get("X-SSL-Client-Dn")
 			.map(|s| String::from_utf8_lossy(s.as_bytes()))
 		{
-			return Ok(CertDn(ssl_client_s_dn.to_string()))
+			return Ok(CertDn(ssl_client_s_dn.to_string()));
 		} else {
 			return Err(CertDnExtractionError::ReverseProxyMisconfigured);
 		}
-    }
+	}
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -74,14 +76,14 @@ pub enum CertDnExtractionError {
 }
 
 impl From<&CertDnExtractionError> for StatusCode {
-    fn from(err: &CertDnExtractionError) -> Self {
+	fn from(err: &CertDnExtractionError) -> Self {
 		use CertDnExtractionError::*;
-        match err {
+		match err {
 			CertValidationFailed(_) => StatusCode::FORBIDDEN,
 			ReverseProxyMisconfigured => StatusCode::INTERNAL_SERVER_ERROR,
 			NoTlsCert => StatusCode::UNAUTHORIZED,
 		}
-    }
+	}
 }
 
 impl IntoResponse for CertDnExtractionError {
@@ -107,27 +109,22 @@ pub enum UserExtractionError {
 	#[error("No UID field in TLS client certificate's Subject DN")]
 	NoUidFieldInCert,
 	#[error("Error parsing TLS client certificate data")]
-	Certificate(#[from] CertDnExtractionError)
+	Certificate(#[from] CertDnExtractionError),
 }
 impl From<&UserExtractionError> for StatusCode {
-    fn from(err: &UserExtractionError) -> Self {
+	fn from(err: &UserExtractionError) -> Self {
 		use UserExtractionError::*;
-        match err {
+		match err {
 			Sql(_) => StatusCode::INTERNAL_SERVER_ERROR,
 			UserNotFound => StatusCode::UNAUTHORIZED,
 			NoUidFieldInCert => StatusCode::BAD_REQUEST,
 			Certificate(err) => StatusCode::from(err),
 		}
-    }
+	}
 }
 impl IntoResponse for UserExtractionError {
 	fn into_response(self) -> Response {
-		(
-			StatusCode::from(&self),
-			[("Content-Type", "text/plain")],
-			self.to_string(),
-		)
-			.into_response()
+		(StatusCode::from(&self), [("Content-Type", "text/plain")], self.to_string()).into_response()
 	}
 }
 
@@ -143,7 +140,7 @@ impl FromRequestParts<Arc<Service<MigrationsDone>>> for User {
 					Ok(None) => Err(UserExtractionError::UserNotFound),
 					Err(err) => Err(UserExtractionError::Sql(err)),
 				},
-				None => Err(UserExtractionError::NoUidFieldInCert)
+				None => Err(UserExtractionError::NoUidFieldInCert),
 			},
 			#[cfg_attr(debug_assertions, allow(unused_variables))]
 			Err(err) => {

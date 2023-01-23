@@ -44,7 +44,7 @@ type Service = mail_passwd::Service<mail_passwd::MigrationsDone>;
 async fn mainpage(
 	State(backend): State<Arc<Service>>,
 	admin: Option<admin::Admin>,
-	user: mail_passwd::User
+	user: mail_passwd::User,
 ) -> axum::response::Response {
 	axum::response::Html(
 		Layout {

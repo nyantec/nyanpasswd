@@ -1,13 +1,18 @@
 use std::sync::Arc;
 
-use axum::{http::StatusCode, response::{Response, IntoResponse}, extract::State, Json};
+use axum::{
+	extract::State,
+	http::StatusCode,
+	response::{IntoResponse, Response},
+	Json,
+};
 
 use crate::Service;
 
 #[derive(serde::Deserialize)]
 struct AuthenticationForm {
 	user: String,
-	password: String
+	password: String,
 }
 
 /// Check a user password and return one of the following responses:
@@ -24,7 +29,7 @@ async fn authenticate_user(State(db): State<Arc<Service>>, Json(form): Json<Auth
 			Auth::Ok => StatusCode::OK,
 			Auth::NoSuchUser => StatusCode::BAD_REQUEST,
 			Auth::LoginDisabled => StatusCode::FORBIDDEN,
-			Auth::IncorrectPassword => StatusCode::UNAUTHORIZED
+			Auth::IncorrectPassword => StatusCode::UNAUTHORIZED,
 		},
 		Err(err) => {
 			tracing::error!("Error verifying password: {}", err);
@@ -35,7 +40,7 @@ async fn authenticate_user(State(db): State<Arc<Service>>, Json(form): Json<Auth
 
 #[derive(serde::Deserialize)]
 struct LookupForm {
-	user: String
+	user: String,
 }
 
 /// Look up a user in the database and return some info about it. Return 404 if the user does not exist.
@@ -44,7 +49,7 @@ async fn lookup_user(State(db): State<Arc<Service>>, Json(form): Json<LookupForm
 		Ok(Some(user)) => {
 			tracing::debug!("Replying with user data for {}: {:#?}", form.user, user);
 			axum::response::Json(user).into_response()
-		},
+		}
 		Ok(None) => StatusCode::NOT_FOUND.into_response(),
 		Err(err) => {
 			tracing::error!("Error looking up user: {}", err);
