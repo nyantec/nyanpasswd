@@ -59,7 +59,7 @@ async fn list_aliases(State(backend): State<Arc<Service>>) -> axum::response::Re
 
 async fn add_alias(State(backend): State<Arc<Service>>, Form(alias): Form<Alias>) -> axum::response::Response {
 	match backend.add_alias(&alias).await {
-		Ok(()) => StatusCode::RESET_CONTENT.into_response(),
+		Ok(()) => (StatusCode::FOUND, [("Location", "/admin/aliases/")]).into_response(),
 		Err(err) => (
 			StatusCode::INTERNAL_SERVER_ERROR,
 			[("Content-Type", "text/plain")],
@@ -71,7 +71,7 @@ async fn add_alias(State(backend): State<Arc<Service>>, Form(alias): Form<Alias>
 
 async fn delete_alias(State(backend): State<Arc<Service>>, Form(alias): Form<Alias>) -> axum::response::Response {
 	match backend.remove_alias(&alias).await {
-		Ok(()) => StatusCode::RESET_CONTENT.into_response(),
+		Ok(()) => (StatusCode::FOUND, [("Location", "/admin/aliases/")]).into_response(),
 		Err(err) => (
 			StatusCode::INTERNAL_SERVER_ERROR,
 			[("Content-Type", "text/plain")],

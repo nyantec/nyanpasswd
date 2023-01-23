@@ -139,7 +139,7 @@ impl From<ExpiryDate> for Option<DateTime<FixedOffset>> {
 async fn create_user(State(backend): State<Arc<Service>>, Form(form): Form<CreateUserForm>) -> axum::response::Response {
 	match backend.create_user(&form.username, form.expires_at.into()).await {
 		Ok(uuid) => (
-			StatusCode::CREATED,
+			StatusCode::FOUND,
 			[("Location", format!("/admin/manage_user?uid={}", uuid))],
 		)
 			.into_response(),
@@ -204,7 +204,7 @@ struct ManageUserForm {
 async fn deactivate_user(State(backend): State<Arc<Service>>, Form(form): Form<ManageUserForm>) -> axum::response::Response {
 	match backend.toggle_user_login_allowed(form.uid).await {
 		Ok(()) => (
-			StatusCode::CREATED,
+			StatusCode::FOUND,
 			[("Location", format!("/admin/manage_user?uid={}", form.uid))],
 		)
 			.into_response(),
@@ -220,7 +220,7 @@ async fn deactivate_user(State(backend): State<Arc<Service>>, Form(form): Form<M
 async fn expire_user(State(backend): State<Arc<Service>>, Form(form): Form<ManageUserForm>) -> axum::response::Response {
 	match backend.set_user_expiry_date(form.uid, form.expires_at.into()).await {
 		Ok(()) => (
-			StatusCode::CREATED,
+			StatusCode::FOUND,
 			[("Location", format!("/admin/manage_user?uid={}", form.uid))],
 		)
 			.into_response(),
