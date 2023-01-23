@@ -1,6 +1,7 @@
 <!-- -*- mode: mhtml -*- -->
 <main>
   <p>Welcome to the admin UI.</p>
+  <p>To proceed to alias management, <a href="/admin/aliases/">press here</a>.</p>
 
   <section>
 	<h2>Currently registered users</h2>

@@ -38,7 +38,7 @@ pub struct User {
 	pub expires_at: Option<chrono::DateTime<chrono::FixedOffset>>,
 }
 
-#[derive(sqlx::FromRow, Debug, serde::Serialize)]
+#[derive(sqlx::FromRow, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Alias {
 	pub alias_name: String,
 	pub destination: Uuid,

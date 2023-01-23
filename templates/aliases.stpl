@@ -1,0 +1,59 @@
+<!-- -*- mode: mhtml -*- -->
+<main>
+  <h2>Alias management</h2>
+  <p><a href="/admin/">Click here</a> to return to the main administrative dashboard.</a></p>
+
+  <section>
+	<h3>Currently defined aliases</h3>
+	<table>
+	  <thead>
+		<tr>
+		  <th>Alias name</th>
+		  <th colspan="2">Destination</th>
+		</tr>
+	  </thead>
+
+	  <tbody>
+		<% for (alias_name, destination) in aliases { %>
+		<% for (i, uuid) in destination.iter().enumerate() { %>
+		<tr>
+		  <% if i == 0 { %>
+		  <th rowspan="<%= destination.len() %>"><%= alias_name %></th>
+		  <% } %>
+		  <td style="border-right: none; text-align: right;"><%= users.get(&uuid).unwrap().username %></td>
+		  <td style="border-left: none; width: 1%; white-space: nowrap;">
+			<form method="POST" style="display: inline">
+			  <input type="hidden" id="alias_name" name="alias_name" value="<%= alias_name %>">
+			  <input type="hidden" id="destination" name="destination" value="<%= uuid.to_string() %>">
+			  <button formaction="/admin/aliases/delete">Delete</button>
+			</form>
+		  </td>
+		</tr>
+		<% } %>
+		<% } %>
+	  </tbody>
+	</table>
+  </section>
+
+  <section>
+	<form id="create_alias" class="major" method="POST">
+	  <h2>Create new alias</h2>
+	  <p>
+		<b>Note:</b> aliases are capable of "overshadowing" existing users, if
+		the alias name is the same as an existing user. <b>This is intended</b>,
+		and can be used to redirect mail away from a user's mailbox.
+	  </p>
+
+	  <label for="alias_name">Alias name:</label><input id="alias_name" name="alias_name" required>
+
+	  <label for="destination">Destination user</label>
+	  <select name="destination">
+		<% for (uuid, user) in users.iter() { %>
+		<option value="<%= uuid.to_string() %>"><%= user.username %></option>
+		<% } %>
+	  </select>
+
+	  <input type="submit" value="Create">
+	</form>
+  </section>
+</main>

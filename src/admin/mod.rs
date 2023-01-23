@@ -14,6 +14,8 @@ use uuid::Uuid;
 
 use crate::{Layout, Service, COMPANY_NAME, IMPRESSUM};
 
+mod aliases;
+
 pub struct Admin(String);
 #[derive(thiserror::Error, Debug)]
 pub enum AdminRejection {
@@ -238,6 +240,7 @@ pub fn router(backend: Arc<Service>) -> axum::Router {
 		.route("/manage_user", axum::routing::get(manage_user))
 		.route("/expire_user", axum::routing::post(expire_user))
 		.route("/deactivate_user", axum::routing::post(deactivate_user))
+		.nest_service("/aliases", aliases::router(backend.clone()))
 		.with_state(backend)
 		.layer(axum::middleware::from_extractor::<Admin>())
 }
