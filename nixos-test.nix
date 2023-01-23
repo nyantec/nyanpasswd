@@ -6,9 +6,10 @@
 # serial_stdout_on()
 # exec("\n".join(driver.tests.splitlines()[0:13]))
 # ```
-self:
+self: pkgs:
 { lib, ... }: {
   name = "nixos-mail-passwd";
+  hostPkgs = pkgs;
 
   nodes = {
     server = { config, pkgs, lib, ... }: {
