@@ -1,8 +1,9 @@
+use std::collections::HashMap;
+use futures::StreamExt;
 use argon2::{
 	password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
 	Argon2,
 };
-use futures::StreamExt;
 use uuid::Uuid;
 
 mod util {
@@ -35,6 +36,12 @@ pub struct User {
 	pub login_allowed: bool,
 	pub created_at: chrono::DateTime<chrono::FixedOffset>,
 	pub expires_at: Option<chrono::DateTime<chrono::FixedOffset>>,
+}
+
+#[derive(sqlx::FromRow, Debug, serde::Serialize)]
+pub struct Alias {
+	pub alias_name: String,
+	pub destination: Uuid,
 }
 
 static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!();
@@ -73,7 +80,7 @@ pub enum AuthenticationResult {
 	Ok,
 	NoSuchUser,
 	LoginDisabled,
-	IncorrectPassword
+	IncorrectPassword,
 }
 
 impl Service<Created> {
@@ -164,18 +171,22 @@ impl Service<MigrationsDone> {
 		//
 		// See <https://www.postgresql.org/docs/current/transaction-iso.html> for more info.
 		let mut txn = self.db.begin().await?;
-		sqlx::query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY").execute(&mut txn).await?;
+		sqlx::query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY")
+			.execute(&mut txn)
+			.await?;
 		// First, check if user exists and is allowed to log in.
 		match sqlx::query_as::<_, (bool,)>("SELECT login_allowed FROM userdb WHERE username = $1")
 			.bind(user)
 			.fetch_optional(&mut txn)
 			.await
 		{
-			Ok(Some((login_allowed,))) => if !login_allowed {
-				return Ok(AuthenticationResult::LoginDisabled);
-			},
+			Ok(Some((login_allowed,))) => {
+				if !login_allowed {
+					return Ok(AuthenticationResult::LoginDisabled);
+				}
+			}
 			Ok(None) => return Ok(AuthenticationResult::NoSuchUser),
-			Err(err) => return Err(err)
+			Err(err) => return Err(err),
 		};
 
 		let mut stream = sqlx::query_scalar::<_, String>(
@@ -199,7 +210,7 @@ impl Service<MigrationsDone> {
 				Err(err) => {
 					txn.commit().await?;
 					return Err(err);
-				},
+				}
 				Ok(sqlx::Either::Left(_query_result)) => {}
 			}
 		}
@@ -255,7 +266,7 @@ impl Service<MigrationsDone> {
 	pub async fn set_user_expiry_date(
 		&self,
 		user: Uuid,
-		expires_at: Option<chrono::DateTime<chrono::FixedOffset>>
+		expires_at: Option<chrono::DateTime<chrono::FixedOffset>>,
 	) -> sqlx::Result<()> {
 		sqlx::query("UPDATE userdb SET expires_at = $2 WHERE id = $1")
 			.bind(user)
@@ -265,11 +276,40 @@ impl Service<MigrationsDone> {
 
 		Ok(())
 	}
+
+	pub async fn add_alias(&self, alias: &Alias) -> sqlx::Result<()> {
+		sqlx::query("INSERT INTO aliases (alias_name, destination) VALUES ($1, $2)")
+			.bind(alias.alias_name.as_str())
+			.bind(alias.destination)
+			.execute(&self.db)
+			.await?;
+
+		Ok(())
+	}
+	pub async fn remove_alias(&self, alias: &Alias) -> sqlx::Result<()> {
+		sqlx::query("DELETE FROM aliases WHERE alias_name = $1 AND destination = $2")
+			.bind(alias.alias_name.as_str())
+			.bind(alias.destination)
+			.execute(&self.db)
+			.await?;
+
+		Ok(())
+	}
+	pub async fn list_all_aliases(&self) -> sqlx::Result<HashMap<String, Vec<Uuid>>> {
+		let rows =
+			sqlx::query_as::<_, (String, Vec<Uuid>)>("SELECT alias_name, array_agg(destination) FROM aliases GROUP BY alias_name")
+				.fetch_all(&self.db)
+				.await?;
+		let mut hashmap = HashMap::new();
+		hashmap.extend(rows);
+		Ok(hashmap)
+	}
 }
 
 #[cfg(test)]
 mod test {
 	use super::AuthenticationResult;
+	use futures::{StreamExt, TryStreamExt};
 
 	fn create_service(pool: sqlx::PgPool) -> crate::Service<super::MigrationsDone> {
 		// Note: you are DEFINITELY NOT SUPPOSED to be creating this
@@ -295,26 +335,47 @@ mod test {
 
 		// Check that no passwords are defined
 		assert_eq!(svc.list_passwords_for(&user).await?.len(), 0);
-		assert!(matches!(svc.verify_password(&user.username, "AAAAAAAA").await?, AuthenticationResult::IncorrectPassword));
+		assert!(matches!(
+			svc.verify_password(&user.username, "AAAAAAAA").await?,
+			AuthenticationResult::IncorrectPassword
+		));
 		// Generate a password and ensure it matches
 		let password = svc.new_password(&user, "longiflorum", None).await?;
 		assert_eq!(svc.list_passwords_for(&user).await?.len(), 1);
-		assert!(matches!(svc.verify_password(&user.username, &password).await?, AuthenticationResult::Ok));
+		assert!(matches!(
+			svc.verify_password(&user.username, &password).await?,
+			AuthenticationResult::Ok
+		));
 		// Ensure something else isn't accepted
-		assert!(matches!(svc.verify_password(&user.username, "AAAAAAAA").await?, AuthenticationResult::IncorrectPassword));
+		assert!(matches!(
+			svc.verify_password(&user.username, "AAAAAAAA").await?,
+			AuthenticationResult::IncorrectPassword
+		));
 		// Ensure non-unique labels are rejected for the same user
 		svc.new_password(&user, "longiflorum", None).await.unwrap_err();
 		// Generate another password and check if it works
 		let another_password = svc.new_password(&user, "primrose", None).await?;
 		assert_eq!(svc.list_passwords_for(&user).await?.len(), 2);
-		assert!(matches!(svc.verify_password(&user.username, &another_password).await?, AuthenticationResult::Ok));
+		assert!(matches!(
+			svc.verify_password(&user.username, &another_password).await?,
+			AuthenticationResult::Ok
+		));
 		// Check that the older password still works
-		assert!(matches!(svc.verify_password(&user.username, &password).await?, AuthenticationResult::Ok));
+		assert!(matches!(
+			svc.verify_password(&user.username, &password).await?,
+			AuthenticationResult::Ok
+		));
 		// Remove a password
 		svc.rm_password_for(&user, "longiflorum").await?;
 		assert_eq!(svc.list_passwords_for(&user).await?.len(), 1);
-		assert!(matches!(svc.verify_password(&user.username, &password).await?, AuthenticationResult::IncorrectPassword));
-		assert!(matches!(svc.verify_password(&user.username, &another_password).await?, AuthenticationResult::Ok));
+		assert!(matches!(
+			svc.verify_password(&user.username, &password).await?,
+			AuthenticationResult::IncorrectPassword
+		));
+		assert!(matches!(
+			svc.verify_password(&user.username, &another_password).await?,
+			AuthenticationResult::Ok
+		));
 
 		Ok(())
 	}
@@ -330,15 +391,24 @@ mod test {
 		// Create a password for them
 		let password = svc.new_password(&user, "longiflorum", None).await?;
 		// Check that they can log in
-		assert!(matches!(svc.verify_password("vsh", &password).await?, AuthenticationResult::Ok));
+		assert!(matches!(
+			svc.verify_password("vsh", &password).await?,
+			AuthenticationResult::Ok
+		));
 		// Disallow this user to log in
 		svc.toggle_user_login_allowed(uuid).await?;
 		// Check they can't log in
-		assert!(matches!(svc.verify_password("vsh", &password).await?, AuthenticationResult::LoginDisabled));
+		assert!(matches!(
+			svc.verify_password("vsh", &password).await?,
+			AuthenticationResult::LoginDisabled
+		));
 		// Allow this user back
 		svc.toggle_user_login_allowed(uuid).await?;
 		// Ensure they're able to log in again
-		assert!(matches!(svc.verify_password("vsh", &password).await?, AuthenticationResult::Ok));
+		assert!(matches!(
+			svc.verify_password("vsh", &password).await?,
+			AuthenticationResult::Ok
+		));
 
 		Ok(())
 	}
@@ -347,6 +417,35 @@ mod test {
 	async fn test_non_existent_user(pool: sqlx::PgPool) -> sqlx::Result<()> {
 		let svc = create_service(pool);
 		assert!(svc.find_user_by_name("vsh").await.unwrap().is_none());
+
+		Ok(())
+	}
+
+	#[sqlx::test]
+	async fn test_aliases(pool: sqlx::PgPool) -> sqlx::Result<()> {
+		let svc = create_service(pool);
+
+		let users = futures::stream::iter(["vsh", "mvs", "mak"])
+			.then(|user| svc.create_user(user, None))
+			.try_collect::<Vec<uuid::Uuid>>()
+			.await?;
+
+		for user in &users {
+			svc.add_alias(&super::Alias {
+				alias_name: "ops".to_string(),
+				destination: *user,
+			})
+			.await?;
+		}
+
+		let example = {
+			let mut map = std::collections::HashMap::new();
+			map.insert("ops".to_owned(), users.to_vec());
+
+			map
+		};
+
+		assert_eq!(svc.list_all_aliases().await?, example);
 
 		Ok(())
 	}
