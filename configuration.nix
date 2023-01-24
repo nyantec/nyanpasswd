@@ -187,20 +187,22 @@ in {
           CREATE DATABASE mailpasswd TEMPLATE template0 ENCODING 'utf8' LOCALE 'C';
         '';
         ensureUsers = lib.mkMerge [
-          {
-            name = "mailpasswd";
-            ensurePermissions = {
-              "DATABASE mailpasswd" = "ALL PRIVILEGES";
-            };
-          }
-          (lib.mkIf cfg.postfix.enable {
+          [
+            {
+              name = "mailpasswd";
+              ensurePermissions = {
+                "DATABASE mailpasswd" = "ALL PRIVILEGES";
+              };
+            }
+          ]
+          (lib.mkIf cfg.postfix.enable [{
             name = "postfix";
             ensurePermissions = {
               # TODO(@vsh): I wonder if there is a way to grant privileges
               # to a table not yet created... This would be more secure
               "DATABASE mailpasswd" = "CONNECT";
             };
-          })
+          }])
         ];
       };
     })
