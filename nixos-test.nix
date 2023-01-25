@@ -30,6 +30,9 @@ self: pkgs:
         extraConfig = ''
           log_debug = event=*
         '';
+        createMailUser = true;
+        mailUser = "vmail";
+        mailGroup = "vmail";
       };
 
       # We disable nginx since we'll access the service directly

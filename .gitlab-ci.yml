@@ -1,5 +1,6 @@
 stages:
  - build
+ - test
  - lint
 
 nix-build:
@@ -11,6 +12,13 @@ nix-build:
    - nix build
    - nix-copy-closure --include-outputs --to "$NYANTEC_BINARY_CACHE" ./result
 
+nixos-test:
+  stage: test
+  tags:
+   - operations-nix
+  needs: []
+  script:
+   - nix build -v -L --log-format raw .#checks.x86_64-linux.nixos-test
 rustfmt:
   allow_failure: true
   stage: lint
