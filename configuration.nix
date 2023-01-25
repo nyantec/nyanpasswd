@@ -201,6 +201,14 @@ in {
               # TODO(@vsh): I wonder if there is a way to grant privileges
               # to a table not yet created... This would be more secure
               "DATABASE mailpasswd" = "CONNECT";
+              # Some permissions can't be granted until the database and tables are created.
+              # Perhaps it would be wise to move database creation into the initial script.
+              #
+              # The following commands can fix that:
+              # ```
+              # GRANT SELECT ON aliases TO postfix;
+              # GRANT SELECT ON userdb TO postfix;
+              # ```
             };
           }])
         ];
