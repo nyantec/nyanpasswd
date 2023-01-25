@@ -193,5 +193,12 @@ in {
         ];
       };
     })
+    (lib.mkIf (cfg.enable && cfg.postfix.enable) {
+      nixpkgs.overlays = [
+        (final: prev: {
+          postfix = prev.postfix.override { withPgSQL = true; };
+        })
+      ];
+    })
   ];
 }
