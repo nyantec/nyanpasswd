@@ -73,6 +73,9 @@ in {
           The location to store mail of virtual users managed by mail-passwd in. The trailing slash must be present, as the UUID of the user will be appended to this string.
         '';
       };
+      postfix = {
+        enable = mkEnableOption "integration with Postfix";
+      };
     };
   };
 
@@ -183,13 +186,21 @@ in {
         initialScript = pkgs.writeText "initial-script.sql" ''
           CREATE DATABASE mailpasswd TEMPLATE template0 ENCODING 'utf8' LOCALE 'C';
         '';
-        ensureUsers = [
+        ensureUsers = lib.mkMerge [
           {
             name = "mailpasswd";
             ensurePermissions = {
               "DATABASE mailpasswd" = "ALL PRIVILEGES";
             };
           }
+          (lib.mkIf cfg.postfix.enable {
+            name = "postfix";
+            ensurePermissions = {
+              # TODO(@vsh): I wonder if there is a way to grant privileges
+              # to a table not yet created... This would be more secure
+              "DATABASE mailpasswd" = "CONNECT";
+            };
+          })
         ];
       };
     })
@@ -199,6 +210,15 @@ in {
           postfix = prev.postfix.override { withPgSQL = true; };
         })
       ];
+
+      services.postfix.config = {
+        # Use mail-passwd's database for virtual alias maps
+        virtual_alias_maps = "pgsql:${pkgs.writeText "postfix-mail-passwd-aliases.cf" ''
+          hosts = postgresql:///mailpasswd?host=/run/postgresql
+          dbname = mailpasswd
+          query = SELECT userdb.username FROM userdb INNER JOIN aliases ON userdb.id = aliases.destination WHERE alias_name = '%u'
+        ''}";
+      };
     })
   ];
 }
