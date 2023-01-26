@@ -15,7 +15,7 @@ use mail_passwd::{User, Alias};
 #[derive(sailfish::TemplateOnce)]
 #[template(path = "aliases.stpl")]
 struct AliasesPage {
-	aliases: HashMap<String, Vec<Uuid>>,
+	aliases: Vec<(String, Vec<Uuid>)>,
 	users: HashMap<Uuid, User>
 }
 

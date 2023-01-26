@@ -295,14 +295,10 @@ impl Service<MigrationsDone> {
 
 		Ok(())
 	}
-	pub async fn list_all_aliases(&self) -> sqlx::Result<HashMap<String, Vec<Uuid>>> {
-		let rows =
-			sqlx::query_as::<_, (String, Vec<Uuid>)>("SELECT alias_name, array_agg(destination) FROM aliases GROUP BY alias_name ORDER BY alias_name")
-				.fetch_all(&self.db)
-				.await?;
-		let mut hashmap = HashMap::new();
-		hashmap.extend(rows);
-		Ok(hashmap)
+	pub async fn list_all_aliases(&self) -> sqlx::Result<Vec<(String, Vec<Uuid>)>> {
+		sqlx::query_as::<_, (String, Vec<Uuid>)>("SELECT alias_name, array_agg(destination) FROM aliases GROUP BY alias_name ORDER BY alias_name")
+			.fetch_all(&self.db)
+			.await
 	}
 }
 
