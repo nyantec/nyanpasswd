@@ -155,7 +155,7 @@ impl Service<MigrationsDone> {
 
 	#[tracing::instrument]
 	pub async fn list_passwords_for(&self, user: &User) -> sqlx::Result<Vec<Password>> {
-		sqlx::query_as::<_, Password>("SELECT passdb.* FROM passdb WHERE userid = $1")
+		sqlx::query_as::<_, Password>("SELECT passdb.* FROM passdb WHERE userid = $1 ORDER BY passdb.label")
 			.bind(user.id)
 			.fetch_all(&self.db)
 			.await
@@ -236,7 +236,7 @@ impl Service<MigrationsDone> {
 	/// List all users.
 	#[tracing::instrument]
 	pub async fn list_users(&self) -> sqlx::Result<Vec<User>> {
-		sqlx::query_as::<_, User>("SELECT * FROM userdb").fetch_all(&self.db).await
+		sqlx::query_as::<_, User>("SELECT * FROM userdb ORDER BY username").fetch_all(&self.db).await
 	}
 	/// Create a new user.
 	#[tracing::instrument]
@@ -297,7 +297,7 @@ impl Service<MigrationsDone> {
 	}
 	pub async fn list_all_aliases(&self) -> sqlx::Result<HashMap<String, Vec<Uuid>>> {
 		let rows =
-			sqlx::query_as::<_, (String, Vec<Uuid>)>("SELECT alias_name, array_agg(destination) FROM aliases GROUP BY alias_name")
+			sqlx::query_as::<_, (String, Vec<Uuid>)>("SELECT alias_name, array_agg(destination) FROM aliases GROUP BY alias_name ORDER BY alias_name")
 				.fetch_all(&self.db)
 				.await?;
 		let mut hashmap = HashMap::new();
