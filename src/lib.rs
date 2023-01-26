@@ -434,14 +434,7 @@ mod test {
 			.await?;
 		}
 
-		let example = {
-			let mut map = std::collections::HashMap::new();
-			map.insert("ops".to_owned(), users.to_vec());
-
-			map
-		};
-
-		assert_eq!(svc.list_all_aliases().await?, example);
+		assert_eq!(svc.list_all_aliases().await?, vec![("ops".to_owned(), users.to_vec())]);
 
 		Ok(())
 	}
