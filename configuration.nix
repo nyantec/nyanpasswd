@@ -4,6 +4,9 @@ with lib;
 let
   cfg = config.services.nyantec-mail-passwd;
 in {
+  imports = [
+    ./autoconfig.nix
+  ];
   options = {
     services.nyantec-mail-passwd = {
       enable = mkEnableOption "mail-passwd, the password management solution for our mail server";
