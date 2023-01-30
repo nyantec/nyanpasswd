@@ -10,6 +10,7 @@
 		<tr>
 		  <th>Username</th>
 		  <th>Can log in?</th>
+		  <th>Machine account?</th>
 		  <th>Created at</th>
 		  <th>Expires at</th>
 		</tr>
@@ -24,6 +25,9 @@
 		  </td>
 		  <td>
 			<input type="checkbox" disabled <% if user.login_allowed { %>checked<% } %>>
+		  </td>
+		  <td>
+			<input type="checkbox" disabled <% if user.non_human { %>checked<% } %>>
 		  </td>
 		  <td>
 			<time datetime="<%= user.created_at.to_rfc3339() %>">
@@ -52,6 +56,11 @@
 		you'll enter below.
 	  </p>
 
+	  <p>
+		Non-human/machine accounts can have their passwords managed by an
+		administrator. Dashboard access for these accounts is disabled.
+	  </p>
+
 	  <label for="username">Username:</label>
 	  <input id="username" name="username" required>
 
@@ -60,7 +69,7 @@
 
 	  <label for="non_human" class="checkbox-with-label">
 		<input name="non_human" type="checkbox" value="true">
-		Non-human user (check to allow password-management by administrators)
+		Non-human account
 	  </label>
 
 	  <input type="submit" value="Register">
