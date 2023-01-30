@@ -15,6 +15,7 @@ use uuid::Uuid;
 use crate::{Layout, Service, COMPANY_NAME, IMPRESSUM};
 
 mod aliases;
+mod non_human;
 
 pub struct Admin(String);
 #[derive(thiserror::Error, Debug)]
@@ -241,6 +242,8 @@ pub fn router(backend: Arc<Service>) -> axum::Router {
 		.route("/manage_user", axum::routing::get(manage_user))
 		.route("/expire_user", axum::routing::post(expire_user))
 		.route("/deactivate_user", axum::routing::post(deactivate_user))
+		.route("/non_human/create_password", axum::routing::post(non_human::create_password))
+		.route("/non_human/delete_password", axum::routing::post(non_human::delete_password))
 		.nest_service("/aliases", aliases::router(backend.clone()))
 		.with_state(backend)
 		.layer(axum::middleware::from_extractor::<Admin>())

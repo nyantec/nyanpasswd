@@ -23,4 +23,63 @@
 	  <input type="submit" formaction="/admin/deactivate_user" value="Toggle">
 	</form>
   </section>
+  <% if user.non_human { %>
+  <section>
+	<h2>Manage passwords for <code><%= user.username %></code></h2>
+	<% if passwords.is_empty() { %>
+	<p>This user doesn't have any passwords at the moment.</p>
+	<% } else { %>
+	<table>
+	  <thead>
+		<tr>
+		  <th colspan="2">Label</th>
+		  <th>Created at</th>
+		  <th>Expires at</th>
+		</tr>
+	  </thead>
+	  <tbody>
+		<% for password in passwords { %>
+		<tr>
+		  <th style="border-right: none"><%= password.label %></th>
+		  <td style="border-left: none">
+			<form method="POST" style="display: inline">
+			  <input type="hidden" id="uuid" name="uuid" value="<%= user.id.to_string() %>">
+			  <input type="hidden" id="label" name="label" value="<%= password.label %>">
+			  <button formaction="/admin/non_human/delete_password">Delete</button>
+			</form>
+		  </td>
+		  <td><time datetime="<%= password.created_at.to_rfc3339() %>">
+			  <%= password.created_at.to_string() %>
+		  </time></td>
+		  <td><%-
+				password.expires_at.map(|i| {
+				format!("<time datetime=\"{}\">{}</time>", i.to_rfc3339(), i.to_string())
+				}).unwrap_or_else(|| "No expiry".to_string())
+				%>
+		  </td>
+		</tr>
+		<% } %>
+	  </tbody>
+	</table>
+	<% } %>
+  </section>
+  <section>
+	<form id="create_password" class="major" method="POST" action="/admin/non_human/create_password">
+	  <h2>Create new password</h2>
+	  <input type="hidden" id="uuid" name="uuid" value="<%= user.id.to_string() %>">
+	  <label for="label">Password label:</label><input id="label" name="label" required>
+	  
+	  <label for="expires_in">Expires in:</label>
+	  <select name="expires_in">
+		<option value="noexpiry">No expiry</option>
+		<option value="week">Expires in 7 days</option>
+		<option value="month">Expires in 1 month</option>
+		<option value="sixmonths">Expires in 6 months</option>
+		<option value="year">Expires in a year</option>
+	  </select>
+
+	  <input type="submit" value="Generate password">
+	</form>
+  </section>
+  <% } %>
 </main>
