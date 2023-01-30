@@ -218,9 +218,12 @@ impl Service<MigrationsDone> {
 		Ok(AuthenticationResult::IncorrectPassword)
 	}
 	/// Resolve a user by its username.
+	///
+	/// Intended to be used by the authentication API. Internal
+	/// consumers should use [`get_user_by_id`][] instead.
 	#[tracing::instrument]
 	pub async fn find_user_by_name(&self, username: &str) -> sqlx::Result<Option<User>> {
-		sqlx::query_as::<_, User>("SELECT * FROM userdb WHERE username = $1")
+		sqlx::query_as::<_, User>("SELECT * FROM userdb WHERE username = $1 AND (CASE WHEN expires_at != null THEN expires_at > now() ELSE true END)")
 			.bind(username)
 			.fetch_optional(&self.db)
 			.await
