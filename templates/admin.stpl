@@ -58,6 +58,11 @@
 	  <label for="expires_at">Expires at:</label>
 	  <input name="expires_at" is="nyantec-datetime">
 
+	  <label for="non_human" class="checkbox-with-label">
+		<input name="non_human" type="checkbox" value="true">
+		Non-human user (check to allow password-management by administrators)
+	  </label>
+
 	  <input type="submit" value="Register">
 	</form>
   </section>

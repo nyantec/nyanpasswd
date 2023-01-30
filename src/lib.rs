@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use futures::StreamExt;
 use argon2::{
 	password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
@@ -36,6 +35,7 @@ pub struct User {
 	pub login_allowed: bool,
 	pub created_at: chrono::DateTime<chrono::FixedOffset>,
 	pub expires_at: Option<chrono::DateTime<chrono::FixedOffset>>,
+	pub non_human: bool
 }
 
 #[derive(sqlx::FromRow, Debug, serde::Serialize, serde::Deserialize)]
@@ -244,10 +244,12 @@ impl Service<MigrationsDone> {
 		&self,
 		username: &str,
 		expires_at: Option<chrono::DateTime<chrono::FixedOffset>>,
+		non_human: bool,
 	) -> sqlx::Result<Uuid> {
-		sqlx::query_scalar::<_, Uuid>("INSERT INTO userdb (username, expires_at) VALUES ($1, $2) RETURNING id")
+		sqlx::query_scalar::<_, Uuid>("INSERT INTO userdb (username, expires_at, non_human) VALUES ($1, $2, $3) RETURNING id")
 			.bind(username)
 			.bind(expires_at)
+			.bind(non_human)
 			.fetch_one(&self.db)
 			.await
 	}
@@ -325,7 +327,7 @@ mod test {
 	async fn smoke_test(pool: sqlx::PgPool) -> sqlx::Result<()> {
 		let svc = create_service(pool);
 
-		let uuid = svc.create_user("vsh", None).await?;
+		let uuid = svc.create_user("vsh", None, false).await?;
 		let user = svc.find_user_by_name("vsh").await?.unwrap();
 		assert_eq!(user.id, uuid);
 
@@ -381,7 +383,7 @@ mod test {
 		let svc = create_service(pool);
 
 		// Create a user
-		let uuid = svc.create_user("vsh", None).await?;
+		let uuid = svc.create_user("vsh", None, false).await?;
 		let user = svc.find_user_by_name("vsh").await?.unwrap();
 		assert_eq!(user.id, uuid);
 		// Create a password for them
@@ -422,7 +424,7 @@ mod test {
 		let svc = create_service(pool);
 
 		let users = futures::stream::iter(["vsh", "mvs", "mak"])
-			.then(|user| svc.create_user(user, None))
+			.then(|user| svc.create_user(user, None, false))
 			.try_collect::<Vec<uuid::Uuid>>()
 			.await?;
 

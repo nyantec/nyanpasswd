@@ -125,6 +125,7 @@ impl<'de> serde::Deserialize<'de> for ExpiryDate {
 struct CreateUserForm {
 	username: String,
 	expires_at: ExpiryDate,
+	non_human: bool
 }
 
 impl From<ExpiryDate> for Option<DateTime<FixedOffset>> {
@@ -137,7 +138,7 @@ impl From<ExpiryDate> for Option<DateTime<FixedOffset>> {
 }
 
 async fn create_user(State(backend): State<Arc<Service>>, Form(form): Form<CreateUserForm>) -> axum::response::Response {
-	match backend.create_user(&form.username, form.expires_at.into()).await {
+	match backend.create_user(&form.username, form.expires_at.into(), form.non_human).await {
 		Ok(uuid) => (
 			StatusCode::FOUND,
 			[("Location", format!("/admin/manage_user?uid={}", uuid))],

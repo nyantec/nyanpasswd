@@ -39,7 +39,7 @@ form.major {
 	gap: .75em;
 }
 
-form.major > h2, form.major > p {
+form.major > h2, form.major > p, form.major > .checkbox-with-label {
 	grid-column: 1 / 3;
 }
 
