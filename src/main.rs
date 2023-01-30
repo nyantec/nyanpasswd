@@ -46,6 +46,19 @@ async fn mainpage(
 	admin: Option<admin::Admin>,
 	user: mail_passwd::User,
 ) -> axum::response::Response {
+	// This is protection against administrators being too powerful.
+	//
+	// Marking a user as non-human disallows dashboard access by design,
+	// so that the mark is actually meaningful and is not a carte blanche
+	// for administrators to do whatever they want to do in the system.
+	if user.non_human {
+		return (
+			StatusCode::FORBIDDEN,
+			[("Content-Type", "text/plain")],
+			"Non-human users cannot use the dashboard."
+		)
+			.into_response();
+	}
 	axum::response::Html(
 		Layout {
 			company_name: COMPANY_NAME,
