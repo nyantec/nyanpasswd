@@ -34,11 +34,14 @@ struct MainPage {
 #[template(path = "new_password.stpl")]
 struct NewPasswordPage {
 	password: String,
+	prevlink: Option<String>
 }
 
 #[derive(TemplateOnce)]
 #[template(path = "deleted_password.stpl")]
-struct DeletedPasswordPage;
+struct DeletedPasswordPage {
+	prevlink: Option<String>
+}
 
 type Service = mail_passwd::Service<mail_passwd::MigrationsDone>;
 async fn mainpage(
@@ -99,7 +102,7 @@ async fn delete_password(
 		Ok(()) => axum::response::Html(
 			Layout {
 				company_name: COMPANY_NAME,
-				body: DeletedPasswordPage,
+				body: DeletedPasswordPage { prevlink: None },
 				impressum_link: IMPRESSUM,
 			}
 			.render_once()
@@ -157,7 +160,7 @@ async fn create_password(
 		Ok(password) => axum::response::Html(
 			Layout {
 				company_name: COMPANY_NAME,
-				body: NewPasswordPage { password },
+				body: NewPasswordPage { password, prevlink: None },
 				impressum_link: IMPRESSUM,
 			}
 			.render_once()

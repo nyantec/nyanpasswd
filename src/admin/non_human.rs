@@ -75,7 +75,10 @@ Form(form): Form<CreatePasswordForm>,
 		Ok(password) => axum::response::Html(
 			Layout {
 				company_name: COMPANY_NAME,
-				body: NewPasswordPage { password },
+				body: NewPasswordPage {
+					password,
+					prevlink: Some(format!("/admin/manage_user?uid={}", user.id))
+				},
 				impressum_link: IMPRESSUM,
 			}
 			.render_once()
@@ -123,7 +126,9 @@ pub(crate) async fn delete_password(
 		Ok(()) => axum::response::Html(
 			Layout {
 				company_name: COMPANY_NAME,
-				body: DeletedPasswordPage,
+				body: DeletedPasswordPage {
+					prevlink: Some(format!("/admin/manage_user?uid={}", user.id))
+				},
 				impressum_link: IMPRESSUM,
 			}
 			.render_once()
