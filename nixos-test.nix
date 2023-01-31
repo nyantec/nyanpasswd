@@ -54,6 +54,7 @@ in {
 
   testScript = ''
     import time
+    import json
     server.wait_for_unit("default.target")
     # XXX workaround for flaky test, replace by checking for open port on localhost
     time.sleep(1)    
@@ -69,6 +70,8 @@ in {
 
     with subtest("Check that IMAP authentication works"):
         server.succeed(f"curl -vvvvvvv --no-progress-meter imap://localhost:143/ -u vsh:{password}")
+
+    user_json = json.loads(server.succeed("curl --silent --fail http://localhost:3000/api/user_lookup -H 'Content-Type: application/json' -d '{}'".format(json.dumps({"user": "vsh"}))))
 
     with subtest("Check that Dovecot delivers incoming mail properly"):
         status = server.succeed(f"curl --no-progress-meter imap://localhost:143 -u vsh:{password} -X 'STATUS INBOX (MESSAGES)'").strip()
@@ -86,5 +89,8 @@ in {
         print("Mail delivered:", repr(mail))
         if mail != template:
             raise Exception("Mail doesn't match what was sent")
+
+        with subtest("Ensure that the mailbox with the corresponding UUID exists in the filesystem"):
+            server.succeed(f"ls -d /var/spool/mail/{user_json['id']}")
   '';
 }
