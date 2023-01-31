@@ -4,13 +4,15 @@
 
 Intended for mediating access to systems where TLS mutual authentication is not
 feasible to implement (e.g. email, where some clients have trouble with TLS
-client certificates -- *cough* Thunderbird has 16 year old bugs related to that
-*cough*)
+client certificates -- *cough* [Thunderbird has 17 year old bug with TLS
+auth][bugzilla-351638] *cough*)
 
  - Multiple passwords per-user
  - Control user access (allow/disallow login, expiry date for accounts)
  - Non-human accounts supported, with their passwords managed by administrators
  - Access to the dashboard is authenticated using TLS certificates
+
+[bugzilla-351638]: https://bugzilla.mozilla.org/show_bug.cgi?id=351638
 
 ## Glossary
 <dl>
