@@ -1,10 +1,8 @@
 # Note: Use the following to quickly jump to the juicy parts:
 #
 # ```python
-# serial_stdout_off()
-# server.wait_for_unit("default.target")
-# serial_stdout_on()
-# exec("\n".join(driver.tests.splitlines()[0:13]))
+# serial_stdout_off(); server.wait_for_unit("default.target"); serial_stdout_on()
+# exec("\n".join(driver.tests.splitlines()[0:35]))
 # ```
 self: pkgs:
 { lib, nodes, ... }: let
@@ -91,6 +89,6 @@ in {
             raise Exception("Mail doesn't match what was sent")
 
         with subtest("Ensure that the mailbox with the corresponding UUID exists in the filesystem"):
-            server.succeed(f"ls -d /var/spool/mail/{user_json['id']}")
+            server.succeed(f"ls -d ${nodes.server.services.nyantec-mail-passwd.dovecot2.mailhome}/{user_json['id']}/Maildir")
   '';
 }

@@ -6,6 +6,17 @@ let
 in {
   imports = [
     ./autoconfig.nix
+    (mkRemovedOptionModule [ "services" "nyantec-mail-passwd" "dovecot2" "mailLocation" ] ''
+      Use `services.nyantec-mail-passwd.dovecot2.mailhome` instead. Additionally, run the following command to migrate old mailboxes:
+
+      ```
+      mkdir $mailhome
+      for maildir in $mailLocation/*; do
+          mkdir -p "$mailhome/$(basename "$maildir")"
+          mv -T "$maildir" "$mailhome/$(basename "$maildir")/Maildir"
+      end
+      ```
+    '')
   ];
   options = {
     services.nyantec-mail-passwd = {
@@ -68,12 +79,12 @@ in {
         '';
       };
       dovecot2.enable = mkEnableOption "integration with Dovecot";
-      dovecot2.mailLocation = mkOption {
+      dovecot2.mailhome = mkOption {
         type = types.str;
-        default = "maildir:/var/spool/mail/";
-        example = "maildir:/persist/mail/";
+        default = "/var/vmail";
+        example = "/persist/vmail";
         description = mdDoc ''
-          The location to store mail of virtual users managed by mail-passwd in. The trailing slash must be present, as the UUID of the user will be appended to this string.
+          The location to store mail data of virtual users managed by mail-passwd in.
         '';
       };
       postfix = {
@@ -140,8 +151,8 @@ in {
               ((lib.strings.stringLength s)-1)
               s;
             endsWith = c: s: (getLastChar s) == c;
-          in endsWith "/" cfg.dovecot2.mailLocation;
-          message = "services.mail-passwd.dovecot2.mailLocation must end with a slash";
+          in !(endsWith "/" cfg.dovecot2.mailhome);
+          message = "services.nyantec-mail-passwd.dovecot2.mailhome must not end with a slash";
         }
       ];
 
@@ -160,7 +171,7 @@ in {
           src = ./userdb.lua;
           lua_path = luaPath;
           lua_cpath = luaCPath;
-          maildir_location = cfg.dovecot2.mailLocation;
+          mailhome = cfg.dovecot2.mailhome;
         };
       in ''
         userdb {
@@ -178,6 +189,9 @@ in {
         dovecot = prev.dovecot.override { withLua = true; };
         mail-passwd = self.packages.${config.nixpkgs.localSystem.system}.default;
       })];
+      systemd.tmpfiles.rules = [
+        "d ${cfg.dovecot2.mailhome} 0770 ${config.services.dovecot2.mailUser} ${config.services.dovecot2.mailGroup} -"
+      ];
     })
     (lib.mkIf (cfg.enable && cfg.databaseUri == null) {
       systemd.services.mail-passwd = {

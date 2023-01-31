@@ -57,9 +57,10 @@ function auth_userdb_lookup(request)
    local status = lookup_response:status()
    if status == 200 then
 	  local user = json.decode(lookup_response:payload())
-	  local maildir_location = "@maildir_location@" .. user.id
-	  print("Got HTTP 200 with UUID " .. user.id .. ", maildir: " .. maildir_location)
-	  return dovecot.auth.USERDB_RESULT_OK, "mail_location=" .. maildir_location
+	  local maildir_location = "maildir:~/Maildir"
+	  local mailhome_location = "@mailhome@/" .. user.id
+	  print("Got HTTP 200 with UUID " .. user.id .. ", mailhome: " .. mailhome_location)
+	  return dovecot.auth.USERDB_RESULT_OK, { mail_location = maildir_location, mail_home = mailhome_location }
    elseif status == 404 then
 	  return dovecot.auth.USERDB_RESULT_USER_UNKNOWN, payload
    else
