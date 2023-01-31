@@ -49,7 +49,7 @@ self: pkgs:
     mvs = "O = nyantec GmbH, CN = Mikael Voss, GN = Mikael, SN = Voss, UID = mvs"
 
     with subtest("Check that user creation works when admin doesn't have an account"):
-        server.succeed(f"curl --fail -H 'X-Ssl-Verify: SUCCESS' -H 'X-Ssl-Client-Dn: {mvs}' http://localhost:3000/admin/create_user -d username=vsh -d expires_at=\"\"")
+        server.succeed(f"curl --fail -H 'X-Ssl-Verify: SUCCESS' -H 'X-Ssl-Client-Dn: {mvs}' http://localhost:3000/admin/create_user -d username=vsh -d expires_at=\"\" -d non_human=false")
 
     with subtest("Check that passwords can be generated"):
         password = server.succeed(f"curl --silent --fail -H 'X-Ssl-Verify: SUCCESS' -H 'X-Ssl-Client-Dn: {vsh}' -d label=test -d expires_in=noexpiry http://localhost:3000/create_password | grep -o '<code>[^<]*</code>' | cut -b7- | cut -d'<' -f1").strip()
