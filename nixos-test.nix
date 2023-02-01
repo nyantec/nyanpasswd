@@ -2,7 +2,7 @@
 #
 # ```python
 # serial_stdout_off(); server.wait_for_unit("default.target"); serial_stdout_on()
-# exec("\n".join(driver.tests.splitlines()[0:35]))
+# exec("\n".join(driver.tests.splitlines()[0:40]))
 # ```
 self: pkgs:
 { lib, nodes, ... }: let
@@ -12,6 +12,13 @@ self: pkgs:
     Subject: test email to user
 
     This is a test email to a user.
+  '';
+  test-email-to-alias = pkgs.writeText "test-email" ''
+    From: root@localhost
+    To: ops@localhost
+    Subject: test email to alias
+
+    This is a test email to an alias that will get forwarded.
   '';
 in {
   name = "nixos-mail-passwd";
@@ -28,17 +35,51 @@ in {
         rootCACertificate = "";
         crlFile = "";
         dovecot2.enable = true;
+        postfix.enable = true;
         adminUids = ["mvs"];
       };
 
       services.dovecot2 = {
         enable = true;
-        extraConfig = ''
-          log_debug = event=*
-        '';
+        enableLmtp = true;
         createMailUser = true;
         mailUser = "vmail";
         mailGroup = "vmail";
+        extraConfig = ''
+          log_debug = event=*
+
+          service lmtp {
+            unix_listener lmtp {
+              group = postfix
+              mode = 0600
+              user = postfix
+            }
+          }
+
+          service auth {
+            unix_listener auth {
+              mode = 0660
+              # Assuming the default Postfix user and group
+              user = postfix
+              group = postfix
+            }
+          }
+        '';
+      };
+
+      services.postfix = {
+        enable = true;
+        hostname = "localhost";
+        destination = [];
+        config = {
+          virtual_transport = "lmtp:unix:/run/dovecot2/lmtp";
+          virtual_mailbox_domains = ["localhost"];
+          # Dovecot auth
+          # TODO(@vsh): consider migrating to the module as an option
+          smtpd_sasl_type = "dovecot";
+          smtpd_sasl_path = "/run/dovecot2/auth";
+          smtpd_sasl_auth_enable = true;
+        };
       };
 
       # We disable nginx since we'll access the service directly
@@ -46,6 +87,7 @@ in {
 
       system.extraDependencies = [
         test-email
+        test-email-to-alias
       ];
     };
   };
@@ -90,5 +132,18 @@ in {
 
         with subtest("Ensure that the mailbox with the corresponding UUID exists in the filesystem"):
             server.succeed(f"ls -d ${nodes.server.services.nyantec-mail-passwd.dovecot2.mailhome}/{user_json['id']}/Maildir")
+
+    with subtest("Check that Postfix resolves aliases correctly"):
+        server.succeed(f"curl --silent --fail -H 'X-Ssl-Verify: SUCCESS' -H 'X-Ssl-Client-Dn: {mvs}' http://localhost:3000/admin/aliases/ -d alias_name=ops -d destination={user_json['id']}")
+        server.succeed("cat ${test-email-to-alias} | sendmail ops")
+        # Allow things to settle a bit
+        # XXX replace with `wait_until_succeeds`
+        time.sleep(5)
+        status = server.succeed(f"curl --no-progress-meter imap://localhost:143 -u vsh:{password} -X 'STATUS INBOX (MESSAGES)'").strip()
+        if status != "* STATUS INBOX (MESSAGES 2)":
+            raise Exception(f"Mail wasn't delivered: {status}")
+        mail = server.succeed(f"curl --no-progress-meter 'imap://localhost:143/INBOX;UID=2' -u vsh:{password}").replace("\r\n", "\n")
+        if not mail.endswith("This is a test email to an alias that will get forwarded.\n"):
+            raise Exception("Mail doesn't match what was sent")
   '';
 }

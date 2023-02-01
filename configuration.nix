@@ -116,6 +116,9 @@ in {
           ssl_crl ${cfg.crlFile};
         '';
       };
+      nixpkgs.overlays = [(final: prev: {
+        mail-passwd = self.packages.${config.nixpkgs.localSystem.system}.default;
+      })];
       systemd.services.mail-passwd = {
         after = [ "network-online.target" ];
         serviceConfig = {
@@ -187,7 +190,6 @@ in {
       # they removed `services.dovecot2.package`...
       nixpkgs.overlays = [(final: prev: {
         dovecot = prev.dovecot.override { withLua = true; };
-        mail-passwd = self.packages.${config.nixpkgs.localSystem.system}.default;
       })];
       systemd.tmpfiles.rules = [
         "d ${cfg.dovecot2.mailhome} 0770 ${config.services.dovecot2.mailUser} ${config.services.dovecot2.mailGroup} -"
@@ -202,33 +204,20 @@ in {
         enable = true;
         initialScript = pkgs.writeText "initial-script.sql" ''
           CREATE DATABASE mailpasswd TEMPLATE template0 ENCODING 'utf8' LOCALE 'C';
+          \connect mailpasswd
+          CREATE SCHEMA IF NOT EXISTS mailpasswd;
+          CREATE USER mailpasswd;
+          ALTER SCHEMA mailpasswd OWNER TO mailpasswd;
+          GRANT ALL PRIVILEGES ON DATABASE mailpasswd TO mailpasswd;
+          ${lib.optionalString cfg.postfix.enable ''
+            CREATE USER postfix;
+            GRANT CONNECT ON DATABASE mailpasswd TO postfix;
+            GRANT USAGE ON SCHEMA mailpasswd TO postfix;
+            SET ROLE mailpasswd;
+            ALTER DEFAULT PRIVILEGES FOR USER mailpasswd IN SCHEMA mailpasswd GRANT SELECT ON TABLES TO postfix;
+            RESET ROLE;
+          ''}
         '';
-        ensureUsers = lib.mkMerge [
-          [
-            {
-              name = "mailpasswd";
-              ensurePermissions = {
-                "DATABASE mailpasswd" = "ALL PRIVILEGES";
-              };
-            }
-          ]
-          (lib.mkIf cfg.postfix.enable [{
-            name = "postfix";
-            ensurePermissions = {
-              # TODO(@vsh): I wonder if there is a way to grant privileges
-              # to a table not yet created... This would be more secure
-              "DATABASE mailpasswd" = "CONNECT";
-              # Some permissions can't be granted until the database and tables are created.
-              # Perhaps it would be wise to move database creation into the initial script.
-              #
-              # The following commands can fix that:
-              # ```
-              # GRANT SELECT ON aliases TO postfix;
-              # GRANT SELECT ON userdb TO postfix;
-              # ```
-            };
-          }])
-        ];
       };
     })
     (lib.mkIf (cfg.enable && cfg.postfix.enable) {
@@ -237,13 +226,12 @@ in {
           postfix = prev.postfix.override { withPgSQL = true; };
         })
       ];
-
       services.postfix.config = {
         # Use mail-passwd's database for virtual alias maps
         virtual_alias_maps = "pgsql:${pkgs.writeText "postfix-mail-passwd-aliases.cf" ''
           hosts = postgresql:///mailpasswd?host=/run/postgresql
           dbname = mailpasswd
-          query = SELECT userdb.username FROM userdb INNER JOIN aliases ON userdb.id = aliases.destination WHERE alias_name = '%u'
+          query = SELECT userdb.username FROM mailpasswd.userdb INNER JOIN mailpasswd.aliases ON userdb.id = aliases.destination WHERE alias_name = '%u'
         ''}";
       };
     })

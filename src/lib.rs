@@ -116,7 +116,7 @@ impl Service<MigrationsDone> {
 		let mut rng = rand::rngs::OsRng;
 		let password: String = self::util::gen_password(&mut rng);
 
-		sqlx::query("INSERT INTO passdb (userid, label, hash, expires_at) VALUES ($1, $2, $3, $4)")
+		sqlx::query("INSERT INTO mailpasswd.passdb (userid, label, hash, expires_at) VALUES ($1, $2, $3, $4)")
 			.bind(user.id)
 			.bind(label)
 			.bind(
@@ -134,7 +134,7 @@ impl Service<MigrationsDone> {
 	/// Irreversibly remove a password designated by `label` from the specified user.
 	#[tracing::instrument]
 	pub async fn rm_password_for(&self, user: &User, label: &str) -> sqlx::Result<()> {
-		sqlx::query("DELETE FROM passdb WHERE userid = $1 AND label = $2")
+		sqlx::query("DELETE FROM mailpasswd.passdb WHERE userid = $1 AND label = $2")
 			.bind(&user.id)
 			.bind(&label)
 			.execute(&self.db)
@@ -146,7 +146,7 @@ impl Service<MigrationsDone> {
 	#[tracing::instrument]
 	pub async fn list_passwords_for_username(&self, user: &str) -> sqlx::Result<Vec<Password>> {
 		sqlx::query_as::<_, Password>(
-			"SELECT passdb.* FROM passdb INNER JOIN userdb ON userdb.id = userid WHERE userdb.username = $1",
+			"SELECT passdb.* FROM mailpasswd.passdb INNER JOIN mailpasswd.userdb ON userdb.id = userid WHERE userdb.username = $1",
 		)
 		.bind(user)
 		.fetch_all(&self.db)
@@ -155,7 +155,7 @@ impl Service<MigrationsDone> {
 
 	#[tracing::instrument]
 	pub async fn list_passwords_for(&self, user: &User) -> sqlx::Result<Vec<Password>> {
-		sqlx::query_as::<_, Password>("SELECT passdb.* FROM passdb WHERE userid = $1 ORDER BY passdb.label")
+		sqlx::query_as::<_, Password>("SELECT passdb.* FROM mailpasswd.passdb WHERE userid = $1 ORDER BY passdb.label")
 			.bind(user.id)
 			.fetch_all(&self.db)
 			.await
@@ -175,7 +175,7 @@ impl Service<MigrationsDone> {
 			.execute(&mut txn)
 			.await?;
 		// First, check if user exists and is allowed to log in.
-		match sqlx::query_as::<_, (bool,)>("SELECT login_allowed FROM userdb WHERE username = $1")
+		match sqlx::query_as::<_, (bool,)>("SELECT login_allowed FROM mailpasswd.userdb WHERE username = $1")
 			.bind(user)
 			.fetch_optional(&mut txn)
 			.await
@@ -190,7 +190,7 @@ impl Service<MigrationsDone> {
 		};
 
 		let mut stream = sqlx::query_scalar::<_, String>(
-			"SELECT passdb.hash FROM passdb INNER JOIN userdb ON userid = userdb.id WHERE userdb.username = $1",
+			"SELECT passdb.hash FROM mailpasswd.passdb INNER JOIN mailpasswd.userdb ON userid = userdb.id WHERE userdb.username = $1",
 		)
 		.bind(user)
 		.fetch_many(&self.db);
@@ -223,7 +223,7 @@ impl Service<MigrationsDone> {
 	/// consumers should use [`get_user_by_id`][] instead.
 	#[tracing::instrument]
 	pub async fn find_user_by_name(&self, username: &str) -> sqlx::Result<Option<User>> {
-		sqlx::query_as::<_, User>("SELECT * FROM userdb WHERE username = $1 AND (CASE WHEN expires_at != null THEN expires_at > now() ELSE true END)")
+		sqlx::query_as::<_, User>("SELECT * FROM mailpasswd.userdb WHERE username = $1 AND (CASE WHEN expires_at != null THEN expires_at > now() ELSE true END)")
 			.bind(username)
 			.fetch_optional(&self.db)
 			.await
@@ -231,7 +231,7 @@ impl Service<MigrationsDone> {
 	/// Find a user by its static neverchanging UUID.
 	#[tracing::instrument]
 	pub async fn get_user_by_id(&self, uuid: Uuid) -> sqlx::Result<Option<User>> {
-		sqlx::query_as::<_, User>("SELECT * FROM userdb WHERE id = $1")
+		sqlx::query_as::<_, User>("SELECT * FROM mailpasswd.userdb WHERE id = $1")
 			.bind(uuid)
 			.fetch_optional(&self.db)
 			.await
@@ -239,7 +239,7 @@ impl Service<MigrationsDone> {
 	/// List all users.
 	#[tracing::instrument]
 	pub async fn list_users(&self) -> sqlx::Result<Vec<User>> {
-		sqlx::query_as::<_, User>("SELECT * FROM userdb ORDER BY username").fetch_all(&self.db).await
+		sqlx::query_as::<_, User>("SELECT * FROM mailpasswd.userdb ORDER BY username").fetch_all(&self.db).await
 	}
 	/// Create a new user.
 	#[tracing::instrument]
@@ -249,7 +249,7 @@ impl Service<MigrationsDone> {
 		expires_at: Option<chrono::DateTime<chrono::FixedOffset>>,
 		non_human: bool,
 	) -> sqlx::Result<Uuid> {
-		sqlx::query_scalar::<_, Uuid>("INSERT INTO userdb (username, expires_at, non_human) VALUES ($1, $2, $3) RETURNING id")
+		sqlx::query_scalar::<_, Uuid>("INSERT INTO mailpasswd.userdb (username, expires_at, non_human) VALUES ($1, $2, $3) RETURNING id")
 			.bind(username)
 			.bind(expires_at)
 			.bind(non_human)
@@ -259,7 +259,7 @@ impl Service<MigrationsDone> {
 	/// Activate or deactivate a user's login capabilities.
 	#[tracing::instrument]
 	pub async fn toggle_user_login_allowed(&self, user: Uuid) -> sqlx::Result<()> {
-		sqlx::query("UPDATE userdb SET login_allowed = NOT login_allowed WHERE id = $1")
+		sqlx::query("UPDATE mailpasswd.userdb SET login_allowed = NOT login_allowed WHERE id = $1")
 			.bind(user)
 			.execute(&self.db)
 			.await?;
@@ -273,7 +273,7 @@ impl Service<MigrationsDone> {
 		user: Uuid,
 		expires_at: Option<chrono::DateTime<chrono::FixedOffset>>,
 	) -> sqlx::Result<()> {
-		sqlx::query("UPDATE userdb SET expires_at = $2 WHERE id = $1")
+		sqlx::query("UPDATE mailpasswd.userdb SET expires_at = $2 WHERE id = $1")
 			.bind(user)
 			.bind(expires_at)
 			.execute(&self.db)
@@ -283,7 +283,7 @@ impl Service<MigrationsDone> {
 	}
 
 	pub async fn add_alias(&self, alias: &Alias) -> sqlx::Result<()> {
-		sqlx::query("INSERT INTO aliases (alias_name, destination) VALUES ($1, $2)")
+		sqlx::query("INSERT INTO mailpasswd.aliases (alias_name, destination) VALUES ($1, $2)")
 			.bind(alias.alias_name.as_str())
 			.bind(alias.destination)
 			.execute(&self.db)
@@ -292,7 +292,7 @@ impl Service<MigrationsDone> {
 		Ok(())
 	}
 	pub async fn remove_alias(&self, alias: &Alias) -> sqlx::Result<()> {
-		sqlx::query("DELETE FROM aliases WHERE alias_name = $1 AND destination = $2")
+		sqlx::query("DELETE FROM mailpasswd.aliases WHERE alias_name = $1 AND destination = $2")
 			.bind(alias.alias_name.as_str())
 			.bind(alias.destination)
 			.execute(&self.db)
@@ -301,7 +301,7 @@ impl Service<MigrationsDone> {
 		Ok(())
 	}
 	pub async fn list_all_aliases(&self) -> sqlx::Result<Vec<(String, Vec<Uuid>)>> {
-		sqlx::query_as::<_, (String, Vec<Uuid>)>("SELECT alias_name, array_agg(destination) FROM aliases GROUP BY alias_name ORDER BY alias_name")
+		sqlx::query_as::<_, (String, Vec<Uuid>)>("SELECT alias_name, array_agg(destination) FROM mailpasswd.aliases GROUP BY alias_name ORDER BY alias_name")
 			.fetch_all(&self.db)
 			.await
 	}
