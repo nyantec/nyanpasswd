@@ -90,6 +90,9 @@ in {
       postfix = {
         enable = mkEnableOption "integration with Postfix";
       };
+      radicale = {
+        enable = mkEnableOption "integration with Radicale";
+      };
     };
   };
 
@@ -233,6 +236,22 @@ in {
           dbname = mailpasswd
           query = SELECT userdb.username FROM mailpasswd.userdb INNER JOIN mailpasswd.aliases ON userdb.id = aliases.destination WHERE alias_name = '%u'
         ''}";
+      };
+    })
+    (lib.mkIf (cfg.enable && cfg.radicale.enable) {
+      services.radicale = {
+        enable = true;
+        package = pkgs.radicale.overrideAttrs (old: {
+          propagatedBuildInputs = old.propagatedBuildInputs ++ [
+            self.packages.${config.nixpkgs.localSystem.system}.radicale-plugin-mail-passwd
+          ];
+        });
+        settings = {
+          auth = {
+            type = "radicale_mail_passwd_auth";
+            mail_passwd_uri = "http://localhost:3000";
+          };
+        };
       };
     })
   ];
