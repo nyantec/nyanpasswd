@@ -22,6 +22,14 @@ class Auth(BaseAuth):
         # Check authentication
         logger.debug("Login attempt by %r with password %s", login, password)
 
+        # Note: some applications try to use the email address as the login.
+        # Mail-passwd is designed to manage unlimited domains with the same users,
+        # so we shall strip the domain.
+        if "@" in login:
+            login = login.split("@")[0]
+            if login == "":
+                return ""
+
         response = requests.post(
             uri + "/api/authenticate",
             json = { "user": login, "password": password },
