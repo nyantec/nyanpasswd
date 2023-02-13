@@ -1,7 +1,7 @@
 {
-  description = "mail-passwd";
+  description = "nyanpasswd: A novel authentication system that treats passwords more like per-client tokens";
 
-  inputs.nixpkgs.url = "github:nyantec/nixpkgs/release-22.11";
+  inputs.nixpkgs.url = "github:nixos/nixpkgs/release-22.11";
 
   outputs = { self, nixpkgs }:
   let
@@ -13,11 +13,12 @@
     });
   in {
     overlays.default = final: prev: {
-      mail-passwd = final.callPackage (
+      mail-passwd = final.nyanpasswd;
+      nyanpasswd = final.callPackage (
         { lib, rustPlatform }: let
           cargoToml = builtins.fromTOML (builtins.readFile ./Cargo.toml);
         in rustPlatform.buildRustPackage {
-          pname = "mail-passwd";
+          pname = "nyanpasswd";
           version = cargoToml.package.version;
           src = nixpkgs.lib.cleanSourceWith {
             filter = name: type: let
@@ -50,10 +51,11 @@
           };
         }
       ) {};
-      radicale-plugin-mail-passwd = final.callPackage (
+      radicale-plugin-mail-passwd = final.radicale-plugin-nyanpasswd;
+      radicale-plugin-nyanpasswd = final.callPackage (
         { lib, python3Packages }:
         python3Packages.buildPythonPackage {
-          pname = "radicale-plugin-mail-passwd";
+          pname = "radicale-plugin-nyanpasswd";
           version = "0.1.0";
           src = ./radicale-plugin;
 
@@ -68,15 +70,18 @@
           };
         }
       ) {};
-      radicale-with-mail-passwd = prev.radicale.overrideAttrs (old: {
+      radicale-with-mail-passwd = final.radicale-with-nyanpasswd;
+      radicale-with-nyanpasswd = prev.radicale.overrideAttrs (old: {
         propagatedBuildInputs = old.propagatedBuildInputs ++ [
-          final.radicale-plugin-mail-passwd
+          final.radicale-plugin-nyanpasswd
         ];
       });
     };
 
     packages = forAllSystems (system: {
-      inherit (nixpkgsFor.${system}) mail-passwd radicale-plugin-mail-passwd;
+      inherit (nixpkgsFor.${system})
+        mail-passwd radicale-plugin-mail-passwd
+        nyanpasswd radicale-plugin-nyanpasswd;
       default = self.packages.${system}.mail-passwd;
     });
 

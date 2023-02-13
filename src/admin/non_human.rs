@@ -8,7 +8,7 @@ use axum::{
 };
 use chrono::{DateTime, FixedOffset};
 use hyper::StatusCode;
-use mail_passwd::{axum::CertDn, Password, User};
+use nyanpasswd::{axum::CertDn, Password, User};
 use sailfish::TemplateOnce;
 use uuid::Uuid;
 

@@ -22,7 +22,7 @@ struct AuthenticationForm {
 /// - `401 Unauthorized` - this password is either expired or it is not valid
 /// - `500 Internal Server Error` - service suffered an internal error
 async fn authenticate_user(State(db): State<Arc<Service>>, Json(form): Json<AuthenticationForm>) -> StatusCode {
-	use mail_passwd::AuthenticationResult as Auth;
+	use nyanpasswd::AuthenticationResult as Auth;
 
 	match db.verify_password(&form.user, &form.password).await {
 		Ok(result) => match result {

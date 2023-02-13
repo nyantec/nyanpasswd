@@ -26,8 +26,8 @@ struct Layout<B: TemplateOnce> {
 #[template(path = "main.stpl")]
 struct MainPage {
 	is_admin: bool,
-	user: mail_passwd::User,
-	passwords: Vec<mail_passwd::Password>,
+	user: nyanpasswd::User,
+	passwords: Vec<nyanpasswd::Password>,
 }
 
 #[derive(TemplateOnce)]
@@ -43,11 +43,11 @@ struct DeletedPasswordPage {
 	prevlink: Option<String>
 }
 
-type Service = mail_passwd::Service<mail_passwd::MigrationsDone>;
+type Service = nyanpasswd::Service<nyanpasswd::MigrationsDone>;
 async fn mainpage(
 	State(backend): State<Arc<Service>>,
 	admin: Option<admin::Admin>,
-	user: mail_passwd::User,
+	user: nyanpasswd::User,
 ) -> axum::response::Response {
 	// This is protection against administrators being too powerful.
 	//
@@ -95,7 +95,7 @@ struct DeletePasswordForm {
 
 async fn delete_password(
 	State(backend): State<Arc<Service>>,
-	user: mail_passwd::User,
+	user: nyanpasswd::User,
 	Form(form): Form<DeletePasswordForm>,
 ) -> axum::response::Response {
 	match backend.rm_password_for(&user, &form.label).await {
@@ -135,7 +135,7 @@ struct CreatePasswordForm {
 
 async fn create_password(
 	State(backend): State<Arc<Service>>,
-	user: mail_passwd::User,
+	user: nyanpasswd::User,
 	Form(form): Form<CreatePasswordForm>,
 ) -> axum::response::Response {
 	fn get_time_after_days(days: u64) -> chrono::DateTime<chrono::FixedOffset> {
@@ -193,7 +193,7 @@ async fn main() -> Result<(), hyper::Error> {
 		.with(tracing_subscriber::fmt::layer().json())
 		.init();
 
-	let backend = match mail_passwd::Service::new({
+	let backend = match nyanpasswd::Service::new({
 		let database_url = match std::env::var("DATABASE_URL") {
 			Ok(val) => {
 				tracing::info!("Got database URL: {}", val);

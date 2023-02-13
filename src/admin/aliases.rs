@@ -10,7 +10,7 @@ use axum::{
 use uuid::Uuid;
 
 use crate::{Layout, Service, COMPANY_NAME, IMPRESSUM};
-use mail_passwd::{User, Alias};
+use nyanpasswd::{User, Alias};
 
 #[derive(sailfish::TemplateOnce)]
 #[template(path = "aliases.stpl")]

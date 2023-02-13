@@ -1,4 +1,4 @@
-# nyantec GmbH password management system
+# nyanpasswd authentication system
 
 ## Main features
 
@@ -17,7 +17,7 @@ auth][bugzilla-351638] *cough*)
 ## Glossary
 <dl>
 <dt>Authentication consumer</dt>
-<dd>Software that uses <code>mail-passwd</code> as the authoritative source for authentication decisions.</dd>
+<dd>Software that uses <code>nyanpasswd</code> as the authoritative source for authentication decisions.</dd>
 <dt>Non-human user</dt>
 <dd>A service account that has its password list managed by an administrator.</dd>
 <dt>Machine user</dt>
@@ -28,11 +28,11 @@ auth][bugzilla-351638] *cough*)
 
 ## Users
 
-Since the system isn't intended to mediate shell access, user accounts
-are internally assigned a UUID instead of a numeric Unix account ID. This ID
-should be used by authentication consumers whenever possible, instead of a
-username -- since users may be renamed, and their usernames reused for someone
-else. UUIDs, on the other hand, are guaranteed to remain static.
+Since the system isn't intended to mediate shell access, user accounts are
+internally assigned a UUID instead of a numeric Unix account ID. This ID should
+be used by authentication consumers whenever possible, instead of a username --
+since users may be renamed, and their usernames reused for someone else. UUIDs,
+on the other hand, are guaranteed to remain static.
 
 A user may have an expiry date set. Past the expiration date, the user account
 becomes "invisible" to authentication consumers as if it never existed. This,
@@ -60,7 +60,7 @@ access logging.
 
 ## Aliases
 
-In addition to managing user accounts and usernames, `mail-passwd` also supports
+In addition to managing user accounts and usernames, `nyanpasswd` also supports
 managing email aliases in a centralized manner.
 
 Aliases are usernames not tied to a user account that can be queried
@@ -80,7 +80,7 @@ a copy of the original user when the shadowed user is part of the alias.
 ## Writing new authentication consumers
 ### Using the API
 
-Using the API is the intended way to integrate with `mail-passwd`. The API is a
+Using the API is the intended way to integrate with `nyanpasswd`. The API is a
 stable interface, and will not change without a major version bump.
 
 The API uses JSON as the data serialization format.
@@ -131,14 +131,14 @@ Possible replies:
 ### Using direct database access (not recommended)
 
 While it is not recommended, you can plug an authentication consumer directly
-into the `mail-passwd` Postgres database to read data. This is how the existing
+into the `nyanpasswd`'s Postgres database to read data. This is how the existing
 Postfix integration works (for simplicity, since it only needs aliases).
 
 Please note that there are no stability guarantees on this interface.
 
-All tables are stored in the schema named `mailpasswd`. If you directly access
-the database, it is suggested to create an unprivileged user that has `SELECT`
-rights on the required tables:
+All tables are stored in the schema named `mailpasswd` (legacy name). If you
+directly access the database, it is suggested to create an unprivileged user
+that has `SELECT` rights on the required tables:
 
 ```sql
 CREATE USER postfix;

@@ -8,7 +8,7 @@ use axum::{
 };
 use chrono::{DateTime, FixedOffset};
 use hyper::StatusCode;
-use mail_passwd::{axum::CertDn, Password, User};
+use nyanpasswd::{axum::CertDn, Password, User};
 use sailfish::TemplateOnce;
 use uuid::Uuid;
 
@@ -25,7 +25,7 @@ pub enum AdminRejection {
 	#[error("No UID in certificate")]
 	NoUidInCert,
 	#[error("Certificate parsing error: {0}")]
-	Certificate(#[from] mail_passwd::axum::CertDnExtractionError),
+	Certificate(#[from] nyanpasswd::axum::CertDnExtractionError),
 }
 impl IntoResponse for AdminRejection {
 	fn into_response(self) -> axum::response::Response {
@@ -63,7 +63,7 @@ where
 #[derive(TemplateOnce)]
 #[template(path = "admin.stpl")]
 struct AdminPage {
-	users: Vec<mail_passwd::User>,
+	users: Vec<nyanpasswd::User>,
 }
 
 async fn homepage(State(backend): State<Arc<Service>>) -> axum::response::Response {
