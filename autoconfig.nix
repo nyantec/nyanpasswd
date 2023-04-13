@@ -1,7 +1,7 @@
 { config, options, pkgs, lib, ... }:
 with lib;
 let
-  cfg = config.services.nyantec-mail-passwd.autoconfig;
+  cfg = config.services.nyanpasswd.autoconfig;
 
   serverOptions = {
     hostname = mkOption {
@@ -102,7 +102,7 @@ let
     };
   };
 in {
-  options.services.nyantec-mail-passwd = {
+  options.services.nyanpasswd = {
     # https://wiki.mozilla.org/Thunderbird:Autoconfiguration:ConfigFileFormat
     autoconfig = {
       enable = mkEnableOption "Thunderbird autoconfig file for the mail";
