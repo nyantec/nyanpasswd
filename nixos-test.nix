@@ -21,14 +21,14 @@ self: pkgs:
     This is a test email to an alias that will get forwarded.
   '';
 in {
-  name = "nixos-mail-passwd";
+  name = "nixos-nyanpasswd";
   hostPkgs = pkgs;
 
   nodes = {
     server = { config, pkgs, lib, ... }: {
       imports = [ self.nixosModules.default ];
 
-      services.nyantec-mail-passwd = {
+      services.nyanpasswd = {
         enable = true;
         domain = "localhost";
         # Here, we shim certificate validation since we won't use nginx
@@ -131,7 +131,7 @@ in {
             raise Exception("Mail doesn't match what was sent")
 
         with subtest("Ensure that the mailbox with the corresponding UUID exists in the filesystem"):
-            server.succeed(f"ls -d ${nodes.server.services.nyantec-mail-passwd.dovecot2.mailhome}/{user_json['id']}/Maildir")
+            server.succeed(f"ls -d ${nodes.server.services.nyanpasswd.dovecot2.mailhome}/{user_json['id']}/Maildir")
 
     with subtest("Check that Postfix resolves aliases correctly"):
         server.succeed(f"curl --silent --fail -H 'X-Ssl-Verify: SUCCESS' -H 'X-Ssl-Client-Dn: {mvs}' http://localhost:3000/admin/aliases/ -d alias_name=ops -d destination={user_json['id']}")

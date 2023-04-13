@@ -2,12 +2,12 @@ self:
 { config, pkgs, lib, options, ... }:
 with lib;
 let
-  cfg = config.services.nyantec-mail-passwd;
+  cfg = config.services.nyanpasswd;
 in {
   imports = [
     ./autoconfig.nix
-    (mkRemovedOptionModule [ "services" "nyantec-mail-passwd" "dovecot2" "mailLocation" ] ''
-      Use `services.nyantec-mail-passwd.dovecot2.mailhome` instead. Additionally, run the following command to migrate old mailboxes:
+    (mkRemovedOptionModule [ "services" "nyanpasswd" "dovecot2" "mailLocation" ] ''
+      Use `services.nyanpasswd.dovecot2.mailhome` instead. Additionally, run the following command to migrate old mailboxes:
 
       ```
       mkdir $mailhome
@@ -17,10 +17,11 @@ in {
       end
       ```
     '')
+    (mkRenamedOptionModule ["services" "nyantec-mail-passwd"] ["services" "nyanpasswd"])
   ];
   options = {
-    services.nyantec-mail-passwd = {
-      enable = mkEnableOption "mail-passwd, the password management solution for our mail server";
+    services.nyanpasswd = {
+      enable = mkEnableOption "nyanpasswd, the password management solution for our mail server";
       databaseUri = mkOption {
         type = types.nullOr types.str;
         default = null;
@@ -84,7 +85,7 @@ in {
         default = "/var/vmail";
         example = "/persist/vmail";
         description = mdDoc ''
-          The location to store mail data of virtual users managed by mail-passwd in.
+          The location to store mail data of virtual users managed by nyanpasswd in.
         '';
       };
       postfix = {
@@ -120,12 +121,13 @@ in {
         '';
       };
       nixpkgs.overlays = [(final: prev: {
-        mail-passwd = self.packages.${config.nixpkgs.localSystem.system}.default;
+        mail-passwd = lib.warn "mail-passwd was renamed to nyanpasswd." final.nyanpasswd;
+        nyanpasswd = self.packages.${config.nixpkgs.localSystem.system}.default;
       })];
-      systemd.services.mail-passwd = {
+      systemd.services.nyanpasswd = {
         after = [ "network-online.target" ];
         serviceConfig = {
-          ExecStart = "${pkgs.mail-passwd}/bin/mail-passwd";
+          ExecStart = "${pkgs.nyanpasswd}/bin/nyanpasswd";
           User = lib.mkIf (cfg.user != null) cfg.user;
         };
         environment = {
@@ -144,7 +146,7 @@ in {
         group = "mailpasswd";
       };
       users.groups.mailpasswd = {};
-      systemd.services.mail-passwd = {
+      systemd.services.nyanpasswd = {
         serviceConfig.User = "mailpasswd";
       };
     })
@@ -158,12 +160,12 @@ in {
               s;
             endsWith = c: s: (getLastChar s) == c;
           in !(endsWith "/" cfg.dovecot2.mailhome);
-          message = "services.nyantec-mail-passwd.dovecot2.mailhome must not end with a slash";
+          message = "services.nyanpasswd.dovecot2.mailhome must not end with a slash";
         }
       ];
 
       systemd.services.dovecot2 = {
-        wants = [ "mail-passwd.service" ];
+        wants = [ "nyanpasswd.service" ];
       };
 
       services.dovecot2.extraConfig = let
@@ -199,7 +201,7 @@ in {
       ];
     })
     (lib.mkIf (cfg.enable && cfg.databaseUri == null) {
-      systemd.services.mail-passwd = {
+      systemd.services.nyanpasswd = {
         wants = [ "postgresql.service" ];
         after = [ "postgresql.service" ];
       };
@@ -230,8 +232,8 @@ in {
         })
       ];
       services.postfix.config = {
-        # Use mail-passwd's database for virtual alias maps
-        virtual_alias_maps = "pgsql:${pkgs.writeText "postfix-mail-passwd-aliases.cf" ''
+        # Use nyanpasswd's database for virtual alias maps
+        virtual_alias_maps = "pgsql:${pkgs.writeText "postfix-nyanpasswd-aliases.cf" ''
           hosts = postgresql:///mailpasswd?host=/run/postgresql
           dbname = mailpasswd
           query = SELECT userdb.username FROM mailpasswd.userdb INNER JOIN mailpasswd.aliases ON userdb.id = aliases.destination WHERE alias_name = '%u'
@@ -243,7 +245,7 @@ in {
         enable = true;
         package = pkgs.radicale.overrideAttrs (old: {
           propagatedBuildInputs = old.propagatedBuildInputs ++ [
-            self.packages.${config.nixpkgs.localSystem.system}.radicale-plugin-mail-passwd
+            self.packages.${config.nixpkgs.localSystem.system}.radicale-plugin-nyanpasswd
           ];
         });
         settings = {
