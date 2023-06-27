@@ -181,7 +181,7 @@ impl Service<MigrationsDone> {
 	}
 
 	/// Verify a password for a user identified by their username.
-	#[tracing::instrument]
+	#[tracing::instrument(skip(password))]
 	pub async fn verify_password(&self, user: &str, password: &str) -> sqlx::Result<AuthenticationResult> {
 		// First, wrap things in a transaction. This is because we need extreme granularity in
 		// errors that might be hard to do in a single SELECT statement, but with multiple SELECT
