@@ -1,7 +1,7 @@
 {
   description = "nyanpasswd: A novel authentication system that treats passwords more like per-client tokens";
 
-  inputs.nixpkgs.url = "github:nixos/nixpkgs/release-22.11";
+  inputs.nixpkgs.url = "github:nixos/nixpkgs/release-23.05";
 
   outputs = { self, nixpkgs }:
   let
