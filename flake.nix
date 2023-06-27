@@ -15,7 +15,7 @@
     overlays.default = final: prev: {
       mail-passwd = final.nyanpasswd;
       nyanpasswd = final.callPackage (
-        { lib, rustPlatform }: let
+        { lib, rustPlatform, postgresql }: let
           cargoToml = builtins.fromTOML (builtins.readFile ./Cargo.toml);
         in rustPlatform.buildRustPackage {
           pname = "nyanpasswd";
@@ -35,7 +35,8 @@
             lockFile = ./Cargo.lock;
           };
           
-          checkInputs = with final; [ postgresql ];
+          nativeCheckInputs = [ postgresql ];
+
           preCheck = ''
             export PGDATA=$TMP/postgresql-data
             export DATABASE_URL="postgres://localhost?host=$TMP/postgresql&dbname=mail"
@@ -96,7 +97,7 @@
       default = nixpkgsFor.${system}.mkShell {
         inputsFrom = [ self.packages.${system}.default ];
         nativeBuildInputs = with nixpkgsFor.${system}; [
-          rustfmt sqlx-cli rust-analyzer clippy cargo-watch
+          rustfmt sqlx-cli rust-analyzer clippy cargo-watch postgresql
         ];
 
         shellHook = ''
