@@ -145,6 +145,7 @@ impl<'de> serde::Deserialize<'de> for ExpiryDate {
 struct CreateUserForm {
 	username: String,
 	expires_at: ExpiryDate,
+	#[serde(default)]
 	non_human: bool
 }
 
